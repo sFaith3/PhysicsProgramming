@@ -9,6 +9,9 @@ bool renderParticles = false;
 bool renderCloth = false;
 bool renderCube = false;
 
+int startDrawingFromParticle = 0;
+int numParticlesToDraw = 0;
+
 namespace Sphere {
 	extern void setupSphere(glm::vec3 pos = glm::vec3(0.f, 1.f, 0.f), float radius = 1.f);
 	extern void cleanupSphere();
@@ -64,11 +67,7 @@ void renderPrims() {
 		Capsule::drawCapsule();
 
 	if (renderParticles) {
-		// You may need to rethink this piece of code...
-		int startDrawingFromParticle = 0;
-		int numParticlesToDraw = LilSpheres::maxParticles;
 		LilSpheres::drawParticles(startDrawingFromParticle, numParticlesToDraw);
-		// .............................................
 	}
 	
 	if (renderCloth)
