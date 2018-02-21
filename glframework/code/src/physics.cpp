@@ -1,7 +1,7 @@
 #include <imgui\imgui.h>
 #include <imgui\imgui_impl_sdl_gl3.h>
 #include <limits.h>
-
+#include <glm/vec3.hpp>
 namespace LilSpheres {
 	extern const int maxParticles;
 	extern void updateParticles(int startIdx, int count, float* array_data);
@@ -9,13 +9,18 @@ namespace LilSpheres {
 
 bool show_test_window = false;
 
+// EMITTER
+glm::vec3 posEmitter;
+int numParticlesToSpawn = 100;
+
 // PARTICLES
-float posParticles[SHRT_MAX][3];
+  //Buffer de posición de Particulas
+glm::vec3 *posParticle = new glm::vec3[numParticlesToSpawn];  // Posición de Cada Particula
+ //Buffer de velocidades de Particulas
+glm::vec3 *velParticle = new glm::vec3[numParticlesToSpawn]; // Velocidad de Cada Particula
 int numParticlesEnabled = 0;
 
-// EMITTER
-float posEmitter[3];
-int numParticlesToSpawn = 0;
+
 
 void GUI() {
 	bool show = true;
@@ -39,23 +44,29 @@ void GUI() {
 
 void PhysicsInit() {
 	// Do your initialization code here...
-	for (int i = numParticlesEnabled; i < numParticlesToSpawn; i++) {
-		posParticles[i][0] = posEmitter[0];
-		posParticles[i][1] = posEmitter[1];
-		posParticles[i][2] = posEmitter[2];
-
-		numParticlesEnabled++;
+	posEmitter = { 0.0f,2.0f,0.0f };
+	for (int i = numParticlesEnabled; i < numParticlesToSpawn;i+=3) {
+		/*posParticle = posEmitter;
+		ptrPosParticle[i] = posParticle.x;
+		ptrPosParticle[i+1] = posParticle.y;
+		ptrPosParticle[i+2] = posParticle.z;
+		numParticlesEnabled++;*/
+		
 	}
 }
 
 void PhysicsUpdate(float dt) {
 	// Do your update code here...
-	for (int i = numParticlesEnabled; i > 0; i--) {
+	//for (int i = numParticlesEnabled; i > 0; i--) {
+		
+		//LilSpheres::updateParticles(0, numParticlesEnabled, ptrPosParticle);
 		//TODO Movement and collisions
-	}
+	//}
 }
 
 void PhysicsCleanup() {
 	// Do your cleanup code here...
+	delete[] posParticle;
+	delete[] velParticle;
 	// ............................
 }
