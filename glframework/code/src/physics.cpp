@@ -2,6 +2,7 @@
 #include <imgui\imgui_impl_sdl_gl3.h>
 #include <limits.h>
 #include <glm/vec3.hpp>
+
 namespace LilSpheres {
 	extern const int maxParticles;
 	extern void updateParticles(int startIdx, int count, float* array_data);
@@ -11,15 +12,14 @@ bool show_test_window = false;
 
 // EMITTER
 glm::vec3 posEmitter;
-int numParticlesToSpawn = 100;
+int numParticlesToSpawn = 100; //TODO Para la GUI
 
 // PARTICLES
-  //Buffer de posición de Particulas
-glm::vec3 *posParticle = new glm::vec3[numParticlesToSpawn];  // Posición de Cada Particula
- //Buffer de velocidades de Particulas
-glm::vec3 *velParticle = new glm::vec3[numParticlesToSpawn]; // Velocidad de Cada Particula
+glm::vec3 *ptrPosParticles = new glm::vec3[numParticlesToSpawn];	//Posiciones de las partículas
+glm::vec3 *ptrSpeedParticles = new glm::vec3[numParticlesToSpawn]; //Velocidades de las partículas
 int numParticlesEnabled = 0;
 
+const glm::vec3 GRAVITY = { 0.0f, -9.81f, 0.0f };
 
 
 void GUI() {
@@ -43,30 +43,30 @@ void GUI() {
 }
 
 void PhysicsInit() {
-	// Do your initialization code here...
-	posEmitter = { 0.0f,2.0f,0.0f };
-	for (int i = numParticlesEnabled; i < numParticlesToSpawn;i+=3) {
-		/*posParticle = posEmitter;
-		ptrPosParticle[i] = posParticle.x;
-		ptrPosParticle[i+1] = posParticle.y;
-		ptrPosParticle[i+2] = posParticle.z;
-		numParticlesEnabled++;*/
-		
+	posEmitter = { 0.0f, 2.0f, 0.0f }; //TODO Without magical numbers
+
+	for (int i = numParticlesEnabled; i < numParticlesToSpawn; i++) {
+		ptrPosParticles[i] = posEmitter;
+		numParticlesEnabled++;
 	}
 }
 
 void PhysicsUpdate(float dt) {
-	// Do your update code here...
-	//for (int i = numParticlesEnabled; i > 0; i--) {
+	//LilSpheres::updateParticles(1, numParticlesEnabled, (float*)ptrPosParticles);
+
+	for (int i = numParticlesEnabled - 1; i >= 0; i--) {
+		LilSpheres::updateParticles(i, 1, (float*)ptrPosParticles);
+
+		// Movement
+		ptrPosParticles[i] = ptrPosParticles[i] + dt * ptrSpeedParticles[i];
+		ptrSpeedParticles[i] = ptrSpeedParticles[i] + dt * GRAVITY;
+
+		// TODO Collisions
 		
-		//LilSpheres::updateParticles(0, numParticlesEnabled, ptrPosParticle);
-		//TODO Movement and collisions
-	//}
+	}
 }
 
 void PhysicsCleanup() {
-	// Do your cleanup code here...
-	delete[] posParticle;
-	delete[] velParticle;
-	// ............................
+	delete[] ptrPosParticles;
+	delete[] ptrSpeedParticles;
 }
