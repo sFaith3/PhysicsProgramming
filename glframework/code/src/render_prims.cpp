@@ -11,7 +11,6 @@ bool renderCube = false;
 
 int startDrawingFromParticle = 0;
 int numParticlesToDraw = 0;
-extern int numParticlesEnabled;
 
 namespace Sphere {
 	extern void setupSphere(glm::vec3 pos = glm::vec3(0.f, 1.f, 0.f), float radius = 1.f);
@@ -68,7 +67,7 @@ void renderPrims() {
 		Capsule::drawCapsule();
 
 	if (renderParticles) {
-		LilSpheres::drawParticles(startDrawingFromParticle, numParticlesEnabled);
+		LilSpheres::drawParticles(startDrawingFromParticle, numParticlesToDraw);
 	}
 	
 	if (renderCloth)

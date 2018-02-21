@@ -18,6 +18,7 @@ int numParticlesToSpawn = 100; //TODO Para la GUI
 glm::vec3 *ptrPosParticles = new glm::vec3[numParticlesToSpawn];	//Posiciones de las partículas
 glm::vec3 *ptrSpeedParticles = new glm::vec3[numParticlesToSpawn]; //Velocidades de las partículas
 int numParticlesEnabled = 0;
+extern int numParticlesToDraw;
 
 const glm::vec3 GRAVITY = { 0.0f, -9.81f, 0.0f };
 
@@ -45,9 +46,11 @@ void GUI() {
 void PhysicsInit() {
 	posEmitter = { 0.0f, 2.0f, 0.0f }; //TODO Without magical numbers
 
-	for (int i = numParticlesEnabled; i < numParticlesToSpawn; i++) {
+	for (int i = 0; i < numParticlesToSpawn; i++) {
 		ptrPosParticles[i] = posEmitter;
+		ptrSpeedParticles[i] = { rand() % 1 - 1, rand() % 1 - 1, rand() % 1 - 1 };
 		numParticlesEnabled++;
+		numParticlesToDraw++;
 	}
 }
 
@@ -69,4 +72,7 @@ void PhysicsUpdate(float dt) {
 void PhysicsCleanup() {
 	delete[] ptrPosParticles;
 	delete[] ptrSpeedParticles;
+
+	numParticlesEnabled = 0;
+	numParticlesToDraw = 0;
 }
