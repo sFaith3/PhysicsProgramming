@@ -5,26 +5,28 @@
 #include <SDL2\SDL.h>
 
 /// CONSTANTS
-const int MAX_PARTICLES(100);
-
 // EMITTER
-const int MINIMUM_RATE_PARTICLE_EMITTER(100);
-const int MAXIMUM_RATE_PARTICLE_EMITTER(500);
+const int MINIMUM_RATE_PARTICLES_EMITTER(100);
+const int MAXIMUM_RATE_PARTICLES_EMITTER(1000);
 const float MINIMUM_TIME_PARTICLE_LIFE(1.0f);
 const float MAXIMUM_TIME_PARTICLE_LIFE(100.0f);
-const uint32_t TIME_NEW_PARTICLES(uint32_t(1000.0f));
 
+// FOUNTAIN
+const float MINIMUM_ANGLE_FOUNTAIN(75.0f);
+const float MAXIMUM_ANGLE_FOUNTAIN(115.0f);
 
-const glm::vec3 GRAVITY = { 0.0f, -9.81f, 0.0f };
+const float INITIAL_SPEED_PARTICLES(7.0f);
+
+const glm::vec3 GRAVITY(0.0f, -9.81f, 0.0f);
 
 namespace LilSpheres {
 	extern const int maxParticles;
 	extern void updateParticles(int startIdx, int count, float* array_data);
 }
 
-bool show_test_window = false;
+//bool show_test_window = false;
 
-bool playingSimulation = false;
+bool playingSimulation;
 
 uint32_t lastTime;
 
@@ -34,7 +36,7 @@ enum class EnumTypeMovement
 };
 
 // EMITTER
-int rateParticleEmitter; //It must be >= 100
+int rateParticleEmitter;		//It must be >= 100
 float particleLifeTimeEmitter;  //It must be >= 1.0
 int currTypeEmitter;
 glm::vec3 posEmitter;
@@ -65,10 +67,11 @@ extern int startDrawingFromParticle;
 extern int numParticlesToDraw;
 int numParticlesEnabled;
 
-float particlesLifeTime[MAX_PARTICLES];
+float particlesLifeTime[MAXIMUM_RATE_PARTICLES_EMITTER];
 glm::vec3 *ptrPosParticles;	  //Posiciones de las partículas
 glm::vec3 *ptrSpeedParticles; //Velocidades de las partículas
 
+void PhysicsInit();
 void PhysicsCleanup();
 
 
@@ -81,11 +84,12 @@ void GUI() {
 	ImGui::Checkbox("Play Simulation", &playingSimulation);
 	if (ImGui::Button("Reset Simulation")) {
 		PhysicsCleanup();
+		PhysicsInit();
 	}
 
 	/// EMITER
 	if (ImGui::TreeNode("Emitter")) {
-		ImGui::DragInt("Rate", &rateParticleEmitter, 1.0f, MINIMUM_RATE_PARTICLE_EMITTER, MAXIMUM_RATE_PARTICLE_EMITTER);
+		ImGui::DragInt("Rate", &rateParticleEmitter, 1.0f, MINIMUM_RATE_PARTICLES_EMITTER, MAXIMUM_RATE_PARTICLES_EMITTER);
 		ImGui::DragFloat("Particle life", &particleLifeTimeEmitter, 1.0f, MINIMUM_TIME_PARTICLE_LIFE, MAXIMUM_TIME_PARTICLE_LIFE);
 
 		ImGui::RadioButton("Fountain", &currTypeEmitter, 0); ImGui::SameLine();
@@ -95,8 +99,8 @@ void GUI() {
 		switch (static_cast<EnumTypeMovement>(currTypeEmitter)) {
 		case EnumTypeMovement::FOUNTAIN:
 			ImGui::DragFloat3("Fountain Position", &posEmitter.x);
-			ImGui::DragFloat3("Fountain Direction", &dirEmitter.x, 1.0f, 0.0f, 1.0f);
-			ImGui::DragFloat("Fountain Angle", &angleEmitter);
+			ImGui::DragFloat3("Fountain Direction", &dirEmitter.x, 1.0f, -1.0f, 1.0f);
+			ImGui::DragFloat("Fountain Angle", &angleEmitter, 1.0f, MINIMUM_ANGLE_FOUNTAIN, MAXIMUM_ANGLE_FOUNTAIN);
 			break;
 
 		case EnumTypeMovement::CASCADE:
@@ -147,43 +151,43 @@ void GUI() {
 	ImGui::End();
 
 	// Example code -- ImGui test window. Most of the sample code is in ImGui::ShowTestWindow()
-	if (show_test_window) {
+	/*if (show_test_window) {
 		ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);
 		ImGui::ShowTestWindow(&show_test_window);
-	}
+	}*/
 }
 
 void InitEmitter() {
-	rateParticleEmitter = MINIMUM_RATE_PARTICLE_EMITTER;
+	rateParticleEmitter = MINIMUM_RATE_PARTICLES_EMITTER;
 	particleLifeTimeEmitter = MINIMUM_TIME_PARTICLE_LIFE;
 	currTypeEmitter = (int)EnumTypeMovement::FOUNTAIN;
 	posEmitter = { 0.0f, 0.0f, 0.0f };
 	dirEmitter = { 0.0f, 0.0f, 0.0f };
-	angleEmitter = 0.0f;
+	angleEmitter = MINIMUM_ANGLE_FOUNTAIN;
 }
 
-void InitSphereCollider() {
+void InitColliders() {
+	// Sphere
 	useSphereCollider = false;
 	posSphere = { 0.0f, 0.0f, 0.0f };
 	radiusSphere = 1.0f;
-}
 
-void InitCapsuleCollider() {
+	// Capsule
 	useCapsuleCollider = false;
 	posACapsule = { 0.0f, 0.0f, 0.0f };
 	posBCapsule = { 0.0f, 0.0f, 0.0f };
 	radiusCapsule = 1.0f;
 }
 
-void InitColliders() {
-	InitSphereCollider();
-	InitCapsuleCollider();
-}
-
 void PhysicsInit() {
-	lastTime = uint32_t(0.0f);
+	playingSimulation = false;
 
 	InitEmitter();
+
+	// ELASTICITY & FRICTION
+	elasticCoef = 1.0f;
+	frictionCoef = 0.0f;
+
 	InitColliders();
 
 	// FORCES
@@ -191,57 +195,50 @@ void PhysicsInit() {
 	acceleration = GRAVITY;
 
 	// DATA FOR PARTICLES
+	startDrawingFromParticle = 0;
+	numParticlesToDraw = 0;
 	numParticlesEnabled = 0;
 
-	for (int i = 0; i < MAX_PARTICLES; i++) {
+	for (int i = 0; i < MAXIMUM_RATE_PARTICLES_EMITTER; i++) {
 		particlesLifeTime[i] = 0.0f;
 	}
-	ptrPosParticles = new glm::vec3[MAX_PARTICLES]{ glm::vec3(0.0f, 0.0f, 0.0f) };
-	ptrSpeedParticles = new glm::vec3[MAX_PARTICLES]{ acceleration };
-
-	// ELASTICITY & FRICTION
-	elasticCoef = 1.0f;
-	frictionCoef = 0.0f;
-}
-
-void AddNewParticle() {
-	if (numParticlesToDraw == MAX_PARTICLES - 1) {//
-		elasticCoef = 0.0f;//
-	}//
-	numParticlesToDraw = abs(numParticlesToDraw % (MAX_PARTICLES - 1)) + 1;
-	numParticlesEnabled++;
+	ptrPosParticles = new glm::vec3[MAXIMUM_RATE_PARTICLES_EMITTER]{ glm::vec3(0.0f, 0.0f, 0.0f) };
+	ptrSpeedParticles = new glm::vec3[MAXIMUM_RATE_PARTICLES_EMITTER]{ acceleration };
 }
 
 void NewParticle(int currTypeEmitter) {
-	if (numParticlesEnabled < MAX_PARTICLES) {
+	if (numParticlesEnabled < rateParticleEmitter) {
 		particlesLifeTime[numParticlesToDraw] = particleLifeTimeEmitter;
 		ptrPosParticles[numParticlesToDraw] = posEmitter;
 
 		switch (static_cast<EnumTypeMovement>(currTypeEmitter)) {
-		case EnumTypeMovement::FOUNTAIN:
-			ptrSpeedParticles[numParticlesToDraw] = acceleration;
+		case EnumTypeMovement::FOUNTAIN: //TODO
+			ptrSpeedParticles[numParticlesToDraw] = INITIAL_SPEED_PARTICLES * dirEmitter;
+			
 			break;
 
-		case EnumTypeMovement::CASCADE:
-			//TODO ptrSpeedParticles[numParticlesToDraw] = { , ,  };
+		case EnumTypeMovement::CASCADE: //TODO
+			//ptrSpeedParticles[numParticlesToDraw] = { , ,  };
+			//
 			break;
 
 		default:
 			break;
 		}
-		AddNewParticle();
+		
+		numParticlesToDraw = (numParticlesToDraw % (rateParticleEmitter - 1)) + 1;
+		numParticlesEnabled++;
 	}
 }
 
-void DeleteLastParticle(int currParticle) {
-	particlesLifeTime[currParticle] = 0.0f;
-	startDrawingFromParticle = abs(startDrawingFromParticle % (MAX_PARTICLES - 1)) + 1;
+void DeleteLastParticle() {
+	startDrawingFromParticle = (startDrawingFromParticle % (rateParticleEmitter - 1)) + 1;
 	numParticlesEnabled--;
 }
 
 bool IsParticleAlive(int currParticle, float dt) {
-	if (particlesLifeTime[currParticle] <= 0.0f) {
-		DeleteLastParticle(currParticle);
+	if (particlesLifeTime[currParticle] < 0.0f) {
+		DeleteLastParticle();
 		return false;
 	}
 	else {
@@ -272,15 +269,19 @@ void UpdateCollisions(int currParticle) {
 
 void PhysicsUpdate(float dt) {
 	if (playingSimulation) {
-		// Spawn each specified time
-		
-		//if (/*(currTime - lastTime >= TIME_NEW_PARTICLES || lastTime == 0.0f) &&*/) {
-			NewParticle(currTypeEmitter);
-			
-		//}
+		if (useGravity) {
+			acceleration = GRAVITY;
+		}
 
-		LilSpheres::updateParticles(startDrawingFromParticle, numParticlesToDraw, (float*)ptrPosParticles);
-		for (int i = startDrawingFromParticle; i < numParticlesToDraw; i++) {
+		// Spawn at specified time
+		int numParticlesToEnable = dt * rateParticleEmitter;
+		for (int i = 0; i < numParticlesToEnable; i++) {
+			NewParticle(currTypeEmitter);
+		}
+
+		// Update particles
+		LilSpheres::updateParticles(startDrawingFromParticle, numParticlesEnabled, (float*)ptrPosParticles);
+		for (int i = startDrawingFromParticle; i != numParticlesToDraw; i = (i % (rateParticleEmitter - 1)) + 1) {
 			if (IsParticleAlive(i, dt)) {
 				UpdateParticleMovement(i, dt);
 			}
@@ -289,12 +290,6 @@ void PhysicsUpdate(float dt) {
 }
 
 void PhysicsCleanup() {
-	playingSimulation = false;
-
 	delete[] ptrPosParticles;
 	delete[] ptrSpeedParticles;
-
-	numParticlesToDraw = 0;
-
-	PhysicsInit();
 }
