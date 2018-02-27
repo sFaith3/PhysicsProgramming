@@ -1,7 +1,7 @@
 #include <imgui\imgui.h>
 #include <imgui\imgui_impl_sdl_gl3.h>
 #include <limits.h>
-#include <glm/vec3.hpp>
+#include <glm/glm.hpp>
 #include <SDL2\SDL.h>
 
 /// CONSTANTS
@@ -19,21 +19,28 @@ const float INITIAL_SPEED_PARTICLES(7.0f);
 
 const glm::vec3 GRAVITY(0.0f, -9.81f, 0.0f);
 
+const int FACES_CUBE(6);
+
+
 namespace LilSpheres {
 	extern const int maxParticles;
 	extern void updateParticles(int startIdx, int count, float* array_data);
 }
+
+enum class EnumTypeMovement {
+	FOUNTAIN, CASCADE
+};
+
+struct Plane {
+	glm::vec3 normal;
+	float D;
+};
 
 //bool show_test_window = false;
 
 bool playingSimulation;
 
 uint32_t lastTime;
-
-enum class EnumTypeMovement
-{
-	FOUNTAIN, CASCADE
-};
 
 // EMITTER
 int rateParticleEmitter;		//It must be >= 100
@@ -68,9 +75,12 @@ extern int startDrawingFromParticle;
 extern int endIndexParticlesToDraw;
 
 float particlesLifeTime[MAXIMUM_RATE_PARTICLES_EMITTER];
-glm::vec3 *ptrPosParticles;	  //Posiciones de las partículas
-glm::vec3 *ptrSpeedParticles; //Velocidades de las partículas
+glm::vec3 *ptrPosParticles;	  // Posiciones de las partículas
+glm::vec3 *ptrSpeedParticles; // Velocidades de las partículas
 
+Plane planes[FACES_CUBE];
+
+// Forward declarations
 void PhysicsInit();
 void PhysicsCleanup();
 
@@ -161,7 +171,7 @@ void InitEmitter() {
 	rateParticleEmitter = MINIMUM_RATE_PARTICLES_EMITTER;
 	particleLifeTimeEmitter = MINIMUM_TIME_PARTICLE_LIFE;
 	currTypeEmitter = (int)EnumTypeMovement::FOUNTAIN;
-	posEmitter = { 0.0f, 0.0f, 0.0f };
+	posEmitter = { 0.0f, 2.0f, 0.0f };
 	dirEmitter = { 0.0f, 0.0f, 0.0f };
 	angleEmitter = MINIMUM_ANGLE_FOUNTAIN;
 }
@@ -177,6 +187,26 @@ void InitColliders() {
 	posACapsule = { 0.0f, 0.0f, 0.0f };
 	posBCapsule = { 0.0f, 0.0f, 0.0f };
 	radiusCapsule = 1.0f;
+}
+
+void InitPlanes() {
+	planes[0].normal = glm::vec3(0.f, -1.f, 0.f);
+	planes[0].D = 10;
+
+	planes[1].normal = glm::vec3(0.f, 1.f, 0.f);
+	planes[1].D = 0;
+
+	planes[2].normal = glm::vec3(-1.f, 0.f, 0.f);
+	planes[2].D = 5;
+
+	planes[3].normal = glm::vec3(1.f, 0.f, 0.f);
+	planes[3].D = 5;
+
+	planes[4].normal = glm::vec3(0.f, 0.f, -1.f);
+	planes[4].D = 5;
+
+	planes[5].normal = glm::vec3(0.f, 0.f, 1.f);
+	planes[5].D = 5;
 }
 
 void PhysicsInit() {
@@ -204,6 +234,8 @@ void PhysicsInit() {
 	}
 	ptrPosParticles = new glm::vec3[MAXIMUM_RATE_PARTICLES_EMITTER]{ glm::vec3(0.0f, 0.0f, 0.0f) };
 	ptrSpeedParticles = new glm::vec3[MAXIMUM_RATE_PARTICLES_EMITTER]{ acceleration };
+
+	InitPlanes();
 }
 
 void NewParticle(int currTypeEmitter) {
@@ -247,10 +279,43 @@ bool IsParticleAlive(int currParticle, float dt) {
 	}
 }
 
+void CheckCollision(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 &v) {
+	glm::vec3 n, vn, vt;
+	float D, d;
+
+	for (int i = 0; i < FACES_CUBE; i++) {
+		n = planes[i].normal;
+
+		d = (glm::dot(n, p) + planes[i].D) * (glm::dot(n, p0) + planes[i].D);
+		//d = glm::abs(glm::dot(n, p)) / glm::sqrt((glm::pow(n.x, 2) + glm::pow(n.y, 2) + glm::pow(n.z, 2)));
+
+		/// Collision Particle - Plane
+		if (d <= 0.15f) {
+			// With Elasticity
+			p = p0 - (1 + elasticCoef) * (glm::dot(n, p0) + planes[i].D) * n;
+			v = v0 - (1 + elasticCoef) * glm::dot(n, v0) * n;
+
+			// With Friction
+			vn = glm::dot(n, v) * n;
+			vt = v - vn;
+
+			v = v - (frictionCoef * vt);
+		}
+	}
+}
+
 void UpdateParticleMovement(int currParticle, float dt) {
+	glm::vec3 p0 = ptrPosParticles[currParticle];
+	glm::vec3 p = p0 + dt * ptrSpeedParticles[currParticle];
+	glm::vec3 v0 = ptrSpeedParticles[currParticle];
+	glm::vec3 v = ptrSpeedParticles[currParticle] + dt * GRAVITY;
+
+	CheckCollision(p0, p, v0, v);
+
 	// Euler Method
-	ptrPosParticles[currParticle] = ptrPosParticles[currParticle] + dt * ptrSpeedParticles[currParticle];
-	ptrSpeedParticles[currParticle] = ptrSpeedParticles[currParticle] + dt * GRAVITY;
+	ptrPosParticles[currParticle] = p;
+	ptrSpeedParticles[currParticle] = v;
+
 }
 
 void UpdateCollisions(int currParticle) {

@@ -12,7 +12,7 @@ bool renderCube = false;
 int startDrawingFromParticle = 0;
 int endIndexParticlesToDraw = 0;
 extern int numParticlesEnabled;
-int MAXIMUM_RATE_PARTICLES_EMITTER = 1000;
+extern int MAXIMUM_RATE_PARTICLES_EMITTER = 1000;
 
 namespace Sphere {
 	extern void setupSphere(glm::vec3 pos = glm::vec3(0.f, 1.f, 0.f), float radius = 1.f);
