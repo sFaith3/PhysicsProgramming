@@ -10,7 +10,9 @@ bool renderCloth = false;
 bool renderCube = false;
 
 int startDrawingFromParticle = 0;
-int numParticlesToDraw = 0;
+int endIndexParticlesToDraw = 0;
+extern int numParticlesEnabled;
+int MAXIMUM_RATE_PARTICLES_EMITTER = 1000;
 
 namespace Sphere {
 	extern void setupSphere(glm::vec3 pos = glm::vec3(0.f, 1.f, 0.f), float radius = 1.f);
@@ -67,7 +69,13 @@ void renderPrims() {
 		Capsule::drawCapsule();
 
 	if (renderParticles) {
-		LilSpheres::drawParticles(startDrawingFromParticle, numParticlesToDraw);
+		if (endIndexParticlesToDraw - startDrawingFromParticle < 0) {
+			LilSpheres::drawParticles(startDrawingFromParticle, MAXIMUM_RATE_PARTICLES_EMITTER - startDrawingFromParticle);
+			LilSpheres::drawParticles(0, endIndexParticlesToDraw);
+		}
+		else {
+			LilSpheres::drawParticles(startDrawingFromParticle, numParticlesEnabled);
+		}
 	}
 	
 	if (renderCloth)

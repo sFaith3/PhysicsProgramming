@@ -63,9 +63,9 @@ bool useGravity;
 glm::vec3 acceleration;
 
 // PARTICLES
-extern int startDrawingFromParticle;
-extern int numParticlesToDraw;
 int numParticlesEnabled;
+extern int startDrawingFromParticle;
+extern int endIndexParticlesToDraw;
 
 float particlesLifeTime[MAXIMUM_RATE_PARTICLES_EMITTER];
 glm::vec3 *ptrPosParticles;	  //Posiciones de las partículas
@@ -195,8 +195,8 @@ void PhysicsInit() {
 	acceleration = GRAVITY;
 
 	// DATA FOR PARTICLES
+	endIndexParticlesToDraw = 0;
 	startDrawingFromParticle = 0;
-	numParticlesToDraw = 0;
 	numParticlesEnabled = 0;
 
 	for (int i = 0; i < MAXIMUM_RATE_PARTICLES_EMITTER; i++) {
@@ -207,18 +207,18 @@ void PhysicsInit() {
 }
 
 void NewParticle(int currTypeEmitter) {
-	if (numParticlesEnabled < rateParticleEmitter) {
-		particlesLifeTime[numParticlesToDraw] = particleLifeTimeEmitter;
-		ptrPosParticles[numParticlesToDraw] = posEmitter;
+	if (numParticlesEnabled < MAXIMUM_RATE_PARTICLES_EMITTER) {
+		particlesLifeTime[endIndexParticlesToDraw] = particleLifeTimeEmitter;
+		ptrPosParticles[endIndexParticlesToDraw] = posEmitter;
 
 		switch (static_cast<EnumTypeMovement>(currTypeEmitter)) {
 		case EnumTypeMovement::FOUNTAIN: //TODO
-			ptrSpeedParticles[numParticlesToDraw] = INITIAL_SPEED_PARTICLES * dirEmitter;
+			ptrSpeedParticles[endIndexParticlesToDraw] = INITIAL_SPEED_PARTICLES * dirEmitter;
 			
 			break;
 
 		case EnumTypeMovement::CASCADE: //TODO
-			//ptrSpeedParticles[numParticlesToDraw] = { , ,  };
+			//ptrSpeedParticles[endIndexParticlesToDraw] = { , ,  };
 			//
 			break;
 
@@ -226,13 +226,13 @@ void NewParticle(int currTypeEmitter) {
 			break;
 		}
 		
-		numParticlesToDraw = (numParticlesToDraw % (rateParticleEmitter - 1)) + 1;
+		endIndexParticlesToDraw = (endIndexParticlesToDraw + 1) % MAXIMUM_RATE_PARTICLES_EMITTER;
 		numParticlesEnabled++;
 	}
 }
 
 void DeleteLastParticle() {
-	startDrawingFromParticle = (startDrawingFromParticle % (rateParticleEmitter - 1)) + 1;
+	startDrawingFromParticle = (startDrawingFromParticle + 1) % MAXIMUM_RATE_PARTICLES_EMITTER;
 	numParticlesEnabled--;
 }
 
@@ -267,6 +267,35 @@ void UpdateCollisions(int currParticle) {
 
 }
 
+/*
+	Ring Buffer
+*/
+void UpdateParticles(float dt) {
+	if (endIndexParticlesToDraw - startDrawingFromParticle < 0) {
+		for (int i = startDrawingFromParticle; i < MAXIMUM_RATE_PARTICLES_EMITTER; i++) {
+			if (IsParticleAlive(i, dt)) {
+				UpdateParticleMovement(i, dt);
+			}
+		}
+		for (int i = 0; i < endIndexParticlesToDraw; i++) {
+			if (IsParticleAlive(i, dt)) {
+				UpdateParticleMovement(i, dt);
+			}
+		}
+
+		LilSpheres::updateParticles(startDrawingFromParticle, MAXIMUM_RATE_PARTICLES_EMITTER - startDrawingFromParticle, (float*)&ptrPosParticles[startDrawingFromParticle]);
+		LilSpheres::updateParticles(0, endIndexParticlesToDraw, (float*)&ptrPosParticles[0]);
+	}
+	else {
+		for (int i = startDrawingFromParticle; i < endIndexParticlesToDraw; i++) {
+			if (IsParticleAlive(i, dt)) {
+				UpdateParticleMovement(i, dt);
+			}
+		}
+		LilSpheres::updateParticles(startDrawingFromParticle, numParticlesEnabled, (float*)&ptrPosParticles[startDrawingFromParticle]);
+	}
+}
+
 void PhysicsUpdate(float dt) {
 	if (playingSimulation) {
 		if (useGravity) {
@@ -280,12 +309,7 @@ void PhysicsUpdate(float dt) {
 		}
 
 		// Update particles
-		LilSpheres::updateParticles(startDrawingFromParticle, numParticlesEnabled, (float*)ptrPosParticles);
-		for (int i = startDrawingFromParticle; i != numParticlesToDraw; i = (i % (rateParticleEmitter - 1)) + 1) {
-			if (IsParticleAlive(i, dt)) {
-				UpdateParticleMovement(i, dt);
-			}
-		}
+		UpdateParticles(dt);
 	}
 }
 
