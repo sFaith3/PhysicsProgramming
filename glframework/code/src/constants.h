@@ -15,8 +15,14 @@ namespace Constants {
 	extern const float MINIMUM_ANGLE_FOUNTAIN;
 	extern const float MAXIMUM_ANGLE_FOUNTAIN;
 
-	extern const float INITIAL_SPEED_PARTICLES;
+	// CASCADE
+	extern const int MAXIMUM_PARTICLES_CASCADE; // For the first wave at the pos from A to B
 
+	// PARTICLES
+	extern const int MAX_BUFFER_PARTICLES;
+	extern const glm::vec3 INITIAL_SPEED_PARTICLES;
+
+	// FORCES
 	extern const glm::vec3 GRAVITY;
 
 	extern const int FACES_CUBE;

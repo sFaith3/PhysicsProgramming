@@ -23,7 +23,7 @@ struct Plane {
 	float D;
 };
 
-const int MAX_BUFFER_PARTICLES(20);
+extern const int MAX_BUFFER_PARTICLES(10000);
 
 //bool show_test_window = false;
 
@@ -36,6 +36,9 @@ int currTypeEmitter;
 glm::vec3 posEmitter;
 glm::vec3 dirEmitter;
 float angleEmitter;
+glm::vec3 finalPosEmitter;
+glm::vec3 initialSpeedEmitter;
+int currNumParticlesCascade;
 
 // ELASTICITY & FRICTION
 float elasticCoef;
@@ -100,9 +103,11 @@ void GUI() {
 			break;
 
 		case EnumTypeMovement::CASCADE:
-			ImGui::DragFloat3("Cascade Position", &posEmitter.x);
-			ImGui::DragFloat3("Cascade Direction", &dirEmitter.x, 1.0f, 0.0f, 1.0f);
-			ImGui::DragFloat("Cascade Angle", &angleEmitter, 1.0f, Constants::MINIMUM_ANGLE_FOUNTAIN, Constants::MAXIMUM_ANGLE_FOUNTAIN);
+			ImGui::DragFloat3("Cascade Position A", &posEmitter.x);
+			ImGui::DragFloat3("Cascade Position B", &finalPosEmitter.x);
+			ImGui::DragFloat3("Cascade Velocity", &initialSpeedEmitter.x);
+
+			//currNumParticlesCascade = 0;
 			break;
 
 		default:
@@ -160,6 +165,9 @@ void InitEmitter() {
 	posEmitter = { 0.0f, 2.5f, 0.0f };
 	dirEmitter = { 0.0f, 0.3f, 0.3f };
 	angleEmitter = Constants::MINIMUM_ANGLE_FOUNTAIN;
+	finalPosEmitter = { 2.0f, 2.5f, 0.0f };
+	currNumParticlesCascade = 0;
+	initialSpeedEmitter = Constants::INITIAL_SPEED_PARTICLES;
 }
 
 void InitColliders() {
@@ -224,7 +232,7 @@ void PhysicsInit() {
 	InitColliders();
 
 	// FORCES
-	useGravity = false;
+	useGravity = true;
 	acceleration = Constants::GRAVITY;
 
 	// DATA FOR PARTICLES
@@ -241,22 +249,33 @@ void PhysicsInit() {
 void NewParticle(int currTypeEmitter) {
 	if (numParticlesEnabled + 1 < MAX_BUFFER_PARTICLES) {
 		particlesLifeTime[endIndexParticlesToDraw] = particleLifeTimeEmitter;
-		ptrPosParticles[endIndexParticlesToDraw] = posEmitter;
 
-		glm::vec3 newDirEmitter;
+		glm::vec3 initialDir;
+		glm::vec3 newPos;
+
 		switch (static_cast<EnumTypeMovement>(currTypeEmitter)) {
 		case EnumTypeMovement::FOUNTAIN:
-			newDirEmitter.x = dirEmitter.x * cos(angleEmitter);
-			newDirEmitter.y = dirEmitter.y * sin(angleEmitter);
-			newDirEmitter.z = dirEmitter.z;// * tan(angleEmitter);
+			initialDir.x = dirEmitter.x * cos(angleEmitter);
+			initialDir.y = dirEmitter.y * sin(angleEmitter);
+			initialDir.z = dirEmitter.z;// * tan(angleEmitter);
 
-			ptrSpeedParticles[endIndexParticlesToDraw] = Constants::INITIAL_SPEED_PARTICLES * newDirEmitter;
-			
+			ptrPosParticles[endIndexParticlesToDraw] = posEmitter;
+			ptrSpeedParticles[endIndexParticlesToDraw] = initialSpeedEmitter * initialDir;
+
 			break;
 
-		case EnumTypeMovement::CASCADE: //TODO
-			//ptrSpeedParticles[endIndexParticlesToDraw] = { , ,  };
-			//
+		case EnumTypeMovement::CASCADE:
+			newPos.x = (finalPosEmitter.x - posEmitter.x) / Constants::MAXIMUM_PARTICLES_CASCADE;
+			newPos.y = (finalPosEmitter.y - posEmitter.y) / Constants::MAXIMUM_PARTICLES_CASCADE;
+			newPos.z = (finalPosEmitter.z - posEmitter.z) / Constants::MAXIMUM_PARTICLES_CASCADE;
+
+			currNumParticlesCascade = (currNumParticlesCascade + 1) % Constants::MAXIMUM_PARTICLES_CASCADE;
+			newPos *= (currNumParticlesCascade + 1);
+			newPos += posEmitter;
+
+			ptrPosParticles[endIndexParticlesToDraw] = newPos;
+			ptrSpeedParticles[endIndexParticlesToDraw] = initialSpeedEmitter;
+
 			break;
 
 		default:
@@ -265,6 +284,27 @@ void NewParticle(int currTypeEmitter) {
 		
 		endIndexParticlesToDraw = (endIndexParticlesToDraw + 1) % MAX_BUFFER_PARTICLES;
 		numParticlesEnabled++;
+	}
+}
+
+void UpdateEmitter(float dt) {
+	// Spawn at specified time
+	int numParticlesToEnable = static_cast<int>(dt * rateParticleEmitter);
+	for (int i = 0; i < numParticlesToEnable; i++) {
+		switch (static_cast<EnumTypeMovement>(currTypeEmitter)) {
+		case EnumTypeMovement::FOUNTAIN:
+			NewParticle(currTypeEmitter);
+			break;
+
+		case EnumTypeMovement::CASCADE:
+			for (int i = 0; i < Constants::MAXIMUM_PARTICLES_CASCADE; i++) {
+				NewParticle(currTypeEmitter);
+			}
+			break;
+
+		default:
+			break;
+		}
 	}
 }
 
@@ -300,11 +340,13 @@ void UpdateCollisions(int currParticle) {
 
 void CheckCollision(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 &v) {
 	glm::vec3 n, vn, vt;
-	float D, d;
+	Plane currPlane;
+	float d;
 
 	for (int i = 0; i < Constants::FACES_CUBE; i++) {
-		n = planes[i].normal;
-		d = (glm::dot(n, p) + planes[i].D) * (glm::dot(n, p0) + planes[i].D);
+		currPlane = planes[i];
+		n = currPlane.normal;
+		d = (glm::dot(n, p) + currPlane.D) * (glm::dot(n, p0) + currPlane.D);
 
 		/// Collision Particle - Plane
 		if (d < 0.0f) {
@@ -312,7 +354,7 @@ void CheckCollision(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 &v) {
 			v0 = v;
 
 			// With Elasticity
-			p = p0 - (1 + elasticCoef) * (glm::dot(n, p0) + planes[i].D) * n;
+			p = p0 - (1 + elasticCoef) * (glm::dot(n, p0) + currPlane.D) * n;
 			v = v0 - (1 + elasticCoef) * glm::dot(n, v0) * n;
 
 			// With Friction
@@ -330,8 +372,8 @@ void UpdateParticleMovement(int currParticle, float dt) {
 	glm::vec3 v0 = ptrSpeedParticles[currParticle];
 
 	// Euler Method
-	glm::vec3 p = p0 + dt * ptrSpeedParticles[currParticle];
-	glm::vec3 v = ptrSpeedParticles[currParticle] + dt * Constants::GRAVITY;
+	glm::vec3 p = p0 + dt * v0;
+	glm::vec3 v = v0 + dt * Constants::GRAVITY;
 
 	CheckCollision(p0, p, v0, v);
 
@@ -374,13 +416,7 @@ void PhysicsUpdate(float dt) {
 			acceleration = Constants::GRAVITY;
 		}
 
-		// Spawn at specified time
-		int numParticlesToEnable = dt * rateParticleEmitter;
-		for (int i = 0; i < numParticlesToEnable; i++) {
-			NewParticle(currTypeEmitter);
-		}
-
-		// Update particles
+		UpdateEmitter(dt);
 		UpdateParticles(dt);
 	}
 }
