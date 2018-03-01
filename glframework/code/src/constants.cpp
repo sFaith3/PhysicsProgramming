@@ -12,7 +12,7 @@ namespace Constants {
 	extern const float MAXIMUM_ANGLE_FOUNTAIN(115.0f);
 
 	// CASCADE
-	extern const int MAXIMUM_PARTICLES_CASCADE(15);
+	extern const int MAXIMUM_PARTICLES_CASCADE(20);
 
 	// PARTICLES
 	extern const glm::vec3 INITIAL_SPEED_PARTICLES(2.0f, 2.0f, 2.0f);

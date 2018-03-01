@@ -11,9 +11,10 @@ namespace LilSpheres {
 }
 
 namespace Sphere {
+	extern glm::vec3 posSphere;
+	extern float radiusSphere;
 	extern void setupSphere(glm::vec3 pos, float radius);
 	extern void updateSphere(glm::vec3 pos, float radius);
-
 }
 
 namespace Box {
@@ -29,7 +30,7 @@ struct Plane {
 	float D;
 };
 
-extern const int MAX_BUFFER_PARTICLES(5000);
+extern const int MAX_BUFFER_PARTICLES(1000);
 
 //bool show_test_window = false;
 
@@ -51,9 +52,7 @@ float elasticCoef;
 float frictionCoef;
 
 // SPHERE COLLIDER
-bool renderSphere;
-extern glm::vec3 posSphere;
-extern float radiusSphere;
+extern bool renderSphere;
 
 // CAPSULE COLLIDER
 bool useCapsuleCollider;
@@ -135,8 +134,8 @@ void GUI() {
 	if (ImGui::TreeNode("Colliders")) {
 		// SPHERE
 		ImGui::Checkbox("Use Sphere Collider", &renderSphere);
-		ImGui::DragFloat3("Sphere Position", &posSphere.x);
-		ImGui::DragFloat("Sphere Radius", &radiusSphere);
+		ImGui::DragFloat3("Sphere Position", &Sphere::posSphere.x);
+		ImGui::DragFloat("Sphere Radius", &Sphere::radiusSphere);
 
 		// CAPSULE
 		ImGui::Checkbox("Use Capsule Collider", &useCapsuleCollider);
@@ -179,8 +178,8 @@ void InitEmitter() {
 void InitColliders() {
 	// Sphere
 	renderSphere = false;
-	posSphere = { 0.0f, 0.0f, 0.0f };
-	radiusSphere = 1.0f;
+	Sphere::posSphere = { 0.0f, 0.0f, 0.0f };
+	Sphere::radiusSphere = 1.0f;
 
 	// Capsule
 	useCapsuleCollider = false;
@@ -330,23 +329,57 @@ bool IsParticleAlive(int currParticle, float dt) {
 	}
 }
 
-void UpdateCollisions(int currParticle) {
-	// WALLS
+void CollisionParticlePlane(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 &v, glm::vec3 n, float d) {
+	p0 = p;
+	v0 = v;
 
+	// With Elasticity
+	p = p0 - (1 + elasticCoef) * (glm::dot(n, p0) + d) * n;
+	v = v0 - (1 + elasticCoef) * glm::dot(n, v0) * n;
 
-	// GROUND PLANES
-
-
-	// SPHERE
-
-
-	// CAPSULE
-
+	// With Friction
+	glm::vec3 vn = glm::dot(n, v) * n;
+	glm::vec3 vt = v - vn;
+	v = v - (frictionCoef * vt);
 }
 
-void CheckCollision(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 &v) {
-	glm::vec3 n, vn, vt;
+void CollisionParticleWithSphere(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 &v) {
+	//Calculamos si la distancia entre la particula y el centro de la esfera - el Radio <=0
+	//Formula: d |C-P| = sqrt((pow((Cx - Px),2) , pow((Cy - Py),2) , pow((Cz - Pz),2))
+	float d = glm::sqrt(glm::pow(Sphere::posSphere.x - p.x, 2) + glm::pow(Sphere::posSphere.y - p.y, 2) + glm::pow(Sphere::posSphere.z - p.z, 2));
+	if (d < Sphere::radiusSphere) {
+		glm::vec3 p0p = p - p0;
+		float alfa1 = 0, alfa2 = 0, resultAlfa = 0;
+
+		//Usaremos la equación de la recta y la equacion de la esfera.
+		//Sacaremos una equiacion Ax^2 + bx + c = 0 para descubrir la alfa
+		float a = glm::pow(p0.x - Sphere::posSphere.x, 2) + glm::pow(p0.y - Sphere::posSphere.y, 2) + glm::pow(p0.z - Sphere::posSphere.z, 2) - glm::pow(Sphere::radiusSphere, 2) +
+			2 * ((p0.x - Sphere::posSphere.x) + (p0.y - Sphere::posSphere.y) + (p0.z - Sphere::posSphere.z));
+		float b = 2 * ((p.x - p0.x) + (p.y - p0.y) + (p.z - p0.z));
+		float c = glm::pow(p.x - p0.x, 2) + glm::pow(p.y - p0.y, 2) + glm::pow(p.z - p0.z, 2);
+
+		alfa1 = -b;
+		alfa1 += /*(glm::sqrt((*/glm::pow(b, 2) - 4 * a*c;
+		alfa1 /= 2 * a;
+		alfa2 = -b;
+		alfa2 -= /*(glm::sqrt(*/glm::pow(b, 2) - 4 * a*c;
+		alfa2 /= 2 * a;
+
+		(glm::abs(alfa1) > glm::abs(alfa2)) ? resultAlfa = alfa2 : resultAlfa = alfa1;
+
+		//hacemos la recta r= p0 + &p0p; buscaremos el valor "&".
+		//Una vez tengamos alfa conoceremos el punto de colision.
+		glm::vec3 PuntoColision = { p0.x + p0p.x *resultAlfa, p0.y + p0p.y *resultAlfa, p0.z + p0p.z *resultAlfa };
+		glm::vec3 n = PuntoColision - Sphere::posSphere;/*{ (PuntoColision.x - Sphere::posSphere.x) / 2, (PuntoColision.y - Sphere::posSphere.y) / 2, (PuntoColision.z - Sphere::posSphere.z) / 2 }*/
+		float D = -glm::dot(n, PuntoColision);
+
+		CollisionParticlePlane(p0, p, v0, v, n, D);
+	}
+}
+
+void CollisionParticleWithWallsAndGround(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 &v) {
 	Plane currPlane;
+	glm::vec3 n;
 	float d;
 
 	for (int i = 0; i < Constants::FACES_CUBE; i++) {
@@ -354,79 +387,18 @@ void CheckCollision(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 &v) {
 		n = currPlane.normal;
 		d = (glm::dot(n, p) + currPlane.D) * (glm::dot(n, p0) + currPlane.D);
 
-		/// Collision Particle - Plane
 		if (d < 0.0f) {
-			p0 = p;
-			v0 = v;
-
-			// With Elasticity
-			p = p0 - (1 + elasticCoef) * (glm::dot(n, p0) + currPlane.D) * n;
-			v = v0 - (1 + elasticCoef) * glm::dot(n, v0) * n;
-
-			// With Friction
-			vn = glm::dot(n, v) * n;
-			vt = v - vn;
-			v = v - (frictionCoef * vt);
-
+			CollisionParticlePlane(p0, p, v0, v, n, currPlane.D);
 			break;
 		}
 	}
+}
 
-	//Collisions with Sphere;
-	//Calculamos si la distancia entre la particula y el centro de la esfera - el Radio <=0
-	//Formula: d |C-P| = sqrt((pow((Cx - Px),2) , pow((Cy - Py),2) , pow((Cz - Pz),2))
-	if (renderSphere)
-	{
-		d = glm::sqrt(glm::pow(posSphere.x - p.x, 2) + glm::pow(posSphere.y - p.y, 2) + glm::pow(posSphere.z - p.z, 2)) - radiusSphere;
-		if (d <= 0)
-		{
-			glm::vec3 p0p = p - p0;
-			float alfa1 = 0, alfa2 = 0, resultAlfa = 0;
-			//Usaremos la equación de la recta y la equacion de la esfera.
-			//Sacaremos una equiacion Ax^2 + bx + c = 0 para descubrir la alfa
-			float a = glm::pow(p0.x - posSphere.x, 2) + glm::pow(p0.y - posSphere.y, 2) + glm::pow(p0.z - posSphere.z, 2) - glm::pow(radiusSphere, 2) + 2 * ((p0.x - posSphere.x) + (p0.y - posSphere.y) + (p0.z - posSphere.z));
-			float b = 2 * ((p.x - p0.x) + (p.y - p0.y) + (p.z - p0.z));
-			float c = glm::pow(p.x - p0.x, 2) + glm::pow(p.y - p0.y, 2) + glm::pow(p.z - p0.z, 2);
-
-			alfa1 = -b;
-			alfa1 += /*(glm::sqrt((*/glm::pow(b, 2) - 4 * a*c;
-			alfa1 /= 2 * a;
-			alfa2 = -b;
-			alfa2; -/*(glm::sqrt(*/glm::pow(b, 2) - 4 * a*c;
-			alfa2 /= 2 * a;
-			if (glm::abs(alfa1) > glm::abs(alfa2))
-			{
-				resultAlfa = alfa2;
-			}
-			else {
-				resultAlfa = alfa1;
-			}
-			//hacemos la recta r= p0 + &p0p; buscaremos el valor "&".
-			//Una vez tengamos alfa conoceremos el punto de colision.
-			glm::vec3 PuntoColision = { p0.x + p0p.x *resultAlfa, p0.y + p0p.y *resultAlfa, p0.z + p0p.z *resultAlfa };
-
-			glm::vec3 PuntoColision_CentroEsfera = { (PuntoColision.x - posSphere.x) / 2, (PuntoColision.y - posSphere.y) / 2, (PuntoColision.z - posSphere.z) / 2 };
-
-
-			d = -glm::dot(n, PuntoColision);
-
-			p0 = p;
-			v0 = v;
-
-			// With Elasticity
-			p = p0 - (1 + elasticCoef) * (glm::dot(n, p0) + d) * n;
-			v = v0 - (1 + elasticCoef) * glm::dot(n, v0) * n;
-
-			// With Friction
-			vn = glm::dot(n, v) * n;
-			vt = v - vn;
-			v = v - (frictionCoef * vt);
-
-
-
-		}
+void CheckCollisions(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 &v) {
+	CollisionParticleWithWallsAndGround(p0, p, v0, v);
+	if (renderSphere){
+		CollisionParticleWithSphere(p0, p, v0, v);
 	}
-
 }
 
 void UpdateParticleMovement(int currParticle, float dt) {
@@ -437,7 +409,7 @@ void UpdateParticleMovement(int currParticle, float dt) {
 	glm::vec3 p = p0 + dt * v0;
 	glm::vec3 v = v0 + dt * Constants::GRAVITY;
 
-	CheckCollision(p0, p, v0, v);
+	CheckCollisions(p0, p, v0, v);
 
 	ptrPosParticles[currParticle] = p;
 	ptrSpeedParticles[currParticle] = v;
@@ -477,9 +449,10 @@ void PhysicsUpdate(float dt) {
 		if (useGravity) {
 			acceleration = Constants::GRAVITY;
 		}
-		Sphere::updateSphere(posSphere, radiusSphere);
+
 		UpdateEmitter(dt);
 		UpdateParticles(dt);
+		Sphere::updateSphere(Sphere::posSphere, Sphere::radiusSphere);
 	}
 }
 
