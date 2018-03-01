@@ -14,7 +14,8 @@ namespace Constants {
 	// FOUNTAIN
 	extern const float MINIMUM_ANGLE_FOUNTAIN;
 	extern const float MAXIMUM_ANGLE_FOUNTAIN;
-
+	extern const int MAXIMUM_PARTICLES_FOUNTAIN;
+	extern const float MAXIMUM_RADIUS_FOUNTAIN;
 	// CASCADE
 	extern const int MAXIMUM_PARTICLES_CASCADE; // For the first wave at the pos from A to B
 

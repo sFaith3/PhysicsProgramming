@@ -46,6 +46,7 @@ float angleEmitter;
 glm::vec3 finalPosEmitter;
 glm::vec3 initialSpeedEmitter;
 int currNumParticlesCascade;
+float radioFuente;
 
 // ELASTICITY & FRICTION
 float elasticCoef;
@@ -167,6 +168,7 @@ void InitEmitter() {
 	rateParticleEmitter = Constants::MINIMUM_RATE_PARTICLES_EMITTER;
 	particleLifeTimeEmitter = Constants::MINIMUM_TIME_PARTICLE_LIFE;
 	currTypeEmitter = (int)EnumTypeMovement::FOUNTAIN;
+	radioFuente = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / Constants::MAXIMUM_RADIUS_FOUNTAIN));
 	posEmitter = { 0.0f, 2.5f, 0.0f };
 	dirEmitter = { 0.0f, 0.3f, 0.3f };
 	angleEmitter = Constants::MINIMUM_ANGLE_FOUNTAIN;
@@ -249,6 +251,9 @@ void PhysicsInit() {
 	ptrSpeedParticles = new glm::vec3[MAX_BUFFER_PARTICLES]{ acceleration };
 
 	InitPlanes();
+
+
+
 }
 
 void NewParticle(int currTypeEmitter) {
@@ -260,12 +265,29 @@ void NewParticle(int currTypeEmitter) {
 
 		switch (static_cast<EnumTypeMovement>(currTypeEmitter)) {
 		case EnumTypeMovement::FOUNTAIN: // TODO
-			initialDir.x = dirEmitter.x * cos(angleEmitter);
-			initialDir.y = dirEmitter.y * sin(angleEmitter);
-			initialDir.z = dirEmitter.z;// * tan(angleEmitter);
+
+			//Posicion, Direccion, Angulo
+			
+			//static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / Constants::MAXIMUM_RADIUS_FOUNTAIN));
+			// X = posEmitter.x + cos(angulo)
+			// Y = posEmitter.y + tan(angulo)
+			// Z = posEmitter.z + sin(angulo)
+
+			//Buscamos Vector Velocidad Inicial
+			// Altura = tan(angulo) * radio;
+			// vel.y = altura * dir
+			
+
+
+			initialDir.x =  cos(angleEmitter);
+			initialDir.y =  sin(angleEmitter);
+
+			
+
 
 			ptrPosParticles[endIndexParticlesToDraw] = posEmitter;
 			ptrSpeedParticles[endIndexParticlesToDraw] = initialSpeedEmitter * initialDir;
+
 
 			break;
 
@@ -298,7 +320,9 @@ void UpdateEmitter(float dt) {
 	for (int i = 0; i < numParticlesToEnable && numParticlesEnabled < MAX_BUFFER_PARTICLES - 1; i++) {
 		switch (static_cast<EnumTypeMovement>(currTypeEmitter)) {
 		case EnumTypeMovement::FOUNTAIN:
-			NewParticle(currTypeEmitter);
+			for (int i = 0; i < Constants::MAXIMUM_PARTICLES_FOUNTAIN && numParticlesEnabled < MAX_BUFFER_PARTICLES - 1; i++) {
+				NewParticle(currTypeEmitter);
+			}
 			break;
 
 		case EnumTypeMovement::CASCADE:
@@ -347,7 +371,7 @@ void CollisionParticleWithSphere(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::
 	//Calculamos si la distancia entre la particula y el centro de la esfera - el Radio <=0
 	//Formula: d |C-P| = sqrt((pow((Cx - Px),2) , pow((Cy - Py),2) , pow((Cz - Pz),2))
 	float d = glm::sqrt(glm::pow(Sphere::posSphere.x - p.x, 2) + glm::pow(Sphere::posSphere.y - p.y, 2) + glm::pow(Sphere::posSphere.z - p.z, 2));
-	if (d < Sphere::radiusSphere) {
+	if (d <= Sphere::radiusSphere) {
 		glm::vec3 p0p = p - p0;
 		float alfa1 = 0, alfa2 = 0, resultAlfa = 0;
 
@@ -356,13 +380,13 @@ void CollisionParticleWithSphere(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::
 		float a = glm::pow(p0.x - Sphere::posSphere.x, 2) + glm::pow(p0.y - Sphere::posSphere.y, 2) + glm::pow(p0.z - Sphere::posSphere.z, 2) - glm::pow(Sphere::radiusSphere, 2) +
 			2 * ((p0.x - Sphere::posSphere.x) + (p0.y - Sphere::posSphere.y) + (p0.z - Sphere::posSphere.z));
 		float b = 2 * ((p.x - p0.x) + (p.y - p0.y) + (p.z - p0.z));
-		float c = glm::pow(p.x - p0.x, 2) + glm::pow(p.y - p0.y, 2) + glm::pow(p.z - p0.z, 2);
+		float c = glm::pow(glm::pow(p.x - p0.x, 2) + glm::pow(p.y - p0.y, 2) + glm::pow(p.z - p0.z, 2),2);
 
 		alfa1 = -b;
-		alfa1 += /*(glm::sqrt((*/glm::pow(b, 2) - 4 * a*c;
+		alfa1 += glm::sqrt(glm::pow(b, 2) - 4 * a*c);
 		alfa1 /= 2 * a;
 		alfa2 = -b;
-		alfa2 -= /*(glm::sqrt(*/glm::pow(b, 2) - 4 * a*c;
+		alfa2 -= glm::sqrt(glm::pow(b, 2) - 4 * a*c);
 		alfa2 /= 2 * a;
 
 		(glm::abs(alfa1) > glm::abs(alfa2)) ? resultAlfa = alfa2 : resultAlfa = alfa1;
@@ -370,7 +394,7 @@ void CollisionParticleWithSphere(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::
 		//hacemos la recta r= p0 + &p0p; buscaremos el valor "&".
 		//Una vez tengamos alfa conoceremos el punto de colision.
 		glm::vec3 PuntoColision = { p0.x + p0p.x *resultAlfa, p0.y + p0p.y *resultAlfa, p0.z + p0p.z *resultAlfa };
-		glm::vec3 n = PuntoColision - Sphere::posSphere;/*{ (PuntoColision.x - Sphere::posSphere.x) / 2, (PuntoColision.y - Sphere::posSphere.y) / 2, (PuntoColision.z - Sphere::posSphere.z) / 2 }*/
+		glm::vec3 n = glm::normalize(PuntoColision - Sphere::posSphere);
 		float D = -glm::dot(n, PuntoColision);
 
 		CollisionParticlePlane(p0, p, v0, v, n, D);

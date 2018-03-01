@@ -10,6 +10,8 @@ namespace Constants {
 	// FOUNTAIN
 	extern const float MINIMUM_ANGLE_FOUNTAIN(75.0f);
 	extern const float MAXIMUM_ANGLE_FOUNTAIN(115.0f);
+	extern const int MAXIMUM_PARTICLES_FOUNTAIN(20);
+	extern const float MAXIMUM_RADIUS_FOUNTAIN(3.0f);
 
 	// CASCADE
 	extern const int MAXIMUM_PARTICLES_CASCADE(20);
