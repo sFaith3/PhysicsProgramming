@@ -23,7 +23,7 @@ struct Plane {
 	float D;
 };
 
-extern const int MAX_BUFFER_PARTICLES(10000);
+extern const int MAX_BUFFER_PARTICLES(5000);
 
 //bool show_test_window = false;
 
@@ -247,14 +247,14 @@ void PhysicsInit() {
 }
 
 void NewParticle(int currTypeEmitter) {
-	if (numParticlesEnabled + 1 < MAX_BUFFER_PARTICLES) {
+	if (numParticlesEnabled < MAX_BUFFER_PARTICLES - 1) {
 		particlesLifeTime[endIndexParticlesToDraw] = particleLifeTimeEmitter;
 
 		glm::vec3 initialDir;
 		glm::vec3 newPos;
 
 		switch (static_cast<EnumTypeMovement>(currTypeEmitter)) {
-		case EnumTypeMovement::FOUNTAIN:
+		case EnumTypeMovement::FOUNTAIN: // TODO
 			initialDir.x = dirEmitter.x * cos(angleEmitter);
 			initialDir.y = dirEmitter.y * sin(angleEmitter);
 			initialDir.z = dirEmitter.z;// * tan(angleEmitter);
@@ -290,14 +290,14 @@ void NewParticle(int currTypeEmitter) {
 void UpdateEmitter(float dt) {
 	// Spawn at specified time
 	int numParticlesToEnable = static_cast<int>(dt * rateParticleEmitter);
-	for (int i = 0; i < numParticlesToEnable; i++) {
+	for (int i = 0; i < numParticlesToEnable && numParticlesEnabled < MAX_BUFFER_PARTICLES - 1; i++) {
 		switch (static_cast<EnumTypeMovement>(currTypeEmitter)) {
 		case EnumTypeMovement::FOUNTAIN:
 			NewParticle(currTypeEmitter);
 			break;
 
 		case EnumTypeMovement::CASCADE:
-			for (int i = 0; i < Constants::MAXIMUM_PARTICLES_CASCADE; i++) {
+			for (int i = 0; i < Constants::MAXIMUM_PARTICLES_CASCADE && numParticlesEnabled < MAX_BUFFER_PARTICLES - 1; i++) {
 				NewParticle(currTypeEmitter);
 			}
 			break;
