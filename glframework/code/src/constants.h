@@ -15,6 +15,7 @@ namespace Constants {
 	extern const float MIN_ANGLE_FOUNTAIN;
 	extern const float MAX_ANGLE_FOUNTAIN;
 	extern const int   NUM_PARTICLES_FOUNTAIN;
+	extern const float MIN_RADIUS_FOUNTAIN;
 	extern const float MAX_RADIUS_FOUNTAIN;
 
 	// CASCADE
@@ -24,6 +25,13 @@ namespace Constants {
 	extern const int	   MAX_BUFFER_PARTICLES;
 	extern const glm::vec3 DEFAULT_DIR_PARTICLES;
 	extern const glm::vec3 DEFAULT_SPEED_PARTICLES;
+
+	// COLLIDER CAPSULE
+	extern const glm::vec3 DEFAULT_POS_A_CAPSULE;
+	extern const glm::vec3 DEFAULT_POS_B_CAPSULE;
+	extern const float MIN_RADIUS_CAPSULE;
+	extern const float MAX_RADIUS_CAPSULE;
+	extern const float DEFAULT_RADIUS_CAPSULE;
 
 	// FORCES
 	extern const glm::vec3 GRAVITY;

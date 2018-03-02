@@ -13,8 +13,14 @@ namespace LilSpheres {
 namespace Sphere {
 	extern glm::vec3 posSphere;
 	extern float radiusSphere;
-	extern void setupSphere(glm::vec3 pos, float radius);
 	extern void updateSphere(glm::vec3 pos, float radius);
+}
+
+namespace Capsule {
+	extern glm::vec3 posACapsule;
+	extern glm::vec3 posBCapsule;
+	extern float radiusCapsule;
+	extern void updateCapsule(glm::vec3 posA, glm::vec3 posB, float radius);
 }
 
 namespace Box {
@@ -58,10 +64,7 @@ float frictionCoef;
 extern bool renderSphere;
 
 // CAPSULE COLLIDER
-bool useCapsuleCollider;
-glm::vec3 posACapsule;
-glm::vec3 posBCapsule;
-float radiusCapsule;
+extern bool renderCapsule;
 
 // FORCES
 bool useGravity;
@@ -141,10 +144,10 @@ void GUI() {
 		ImGui::DragFloat("Sphere Radius", &Sphere::radiusSphere);
 
 		// CAPSULE
-		ImGui::Checkbox("Use Capsule Collider", &useCapsuleCollider);
-		ImGui::DragFloat3("Capsule Position A", &posACapsule.x);
-		ImGui::DragFloat3("Capsule Position B", &posBCapsule.x);
-		ImGui::DragFloat("Capsule Radius", &radiusCapsule);
+		ImGui::Checkbox("Use Capsule Collider", &renderCapsule);
+		ImGui::DragFloat3("Capsule Position A", &Capsule::posACapsule.x);
+		ImGui::DragFloat3("Capsule Position B", &Capsule::posBCapsule.x);
+		ImGui::DragFloat("Capsule Radius", &Capsule::radiusCapsule, 1.0f, Constants::MIN_RADIUS_CAPSULE, Constants::MAX_RADIUS_CAPSULE);
 
 		ImGui::TreePop();
 	}
@@ -175,7 +178,7 @@ void InitEmitter() {
 	initialSpeedEmitter = Constants::DEFAULT_SPEED_PARTICLES;
 
 	angleFount = Constants::MIN_ANGLE_FOUNTAIN;
-	radiusFount = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / Constants::MAX_RADIUS_FOUNTAIN));
+	radiusFount = Constants::MIN_RADIUS_FOUNTAIN + (rand() % static_cast<int>(Constants::MAX_RADIUS_FOUNTAIN - Constants::MIN_RADIUS_FOUNTAIN + 1));
 
 	currNumParticlesCascade = 0;
 	finalPosEmitter = { 1.0f, 2.5f, 1.0f };
@@ -188,10 +191,10 @@ void InitColliders() {
 	Sphere::radiusSphere = 1.0f;
 
 	// Capsule
-	useCapsuleCollider = false;
-	posACapsule = { 0.0f, 0.0f, 0.0f };
-	posBCapsule = { 0.0f, 0.0f, 0.0f };
-	radiusCapsule = 1.0f;
+	renderCapsule = false;
+	Capsule::posACapsule = Constants::DEFAULT_POS_A_CAPSULE;
+	Capsule::posBCapsule = Constants::DEFAULT_POS_B_CAPSULE;
+	Capsule::radiusCapsule = Constants::DEFAULT_RADIUS_CAPSULE;
 }
 
 /*
@@ -275,7 +278,7 @@ void NewFountainParticles() {
 		v0.z = sin(currCircumAngle) * radiusFount;
 
 		ptrPosParticles[endIndexParticlesToDraw] = posEmitter;
-		ptrSpeedParticles[endIndexParticlesToDraw] = v0 + dirEmitter; //
+		ptrSpeedParticles[endIndexParticlesToDraw] = v0 + dirEmitter;
 
 		EnableParticle();
 	}
@@ -356,16 +359,39 @@ void CollisionParticlePlane(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 
 	v = v - (frictionCoef * vt);
 }
 
+void CollisionParticleWithCapsule(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 &v) {
+	// P' = B + Clamp((p - B) * (B - A), 0, 1) * (B - A)
+	// d = |P - P'|
+	glm::vec3 _p = Capsule::posBCapsule + glm::clamp((p0 - Capsule::posBCapsule) * (Capsule::posBCapsule - Capsule::posACapsule), 0.0f, 1.0f);
+	float d = glm::sqrt(glm::pow(p0.x - _p.x, 2) + glm::pow(p0.y - _p.y, 2) + glm::pow(p0.z - _p.z, 2));
+
+	if (d < Capsule::radiusCapsule) { // TODO Rebote
+		/*glm::vec3 vAP = p - Capsule::posACapsule;
+		glm::vec3 vBP = p - Capsule::posBCapsule;
+
+		float dAP = glm::sqrt(glm::pow(vAP.x, 2) + glm::pow(vAP.y, 2) + glm::pow(vAP.z, 2));
+		float dBP = glm::sqrt(glm::pow(vBP.x, 2) + glm::pow(vBP.y, 2) + glm::pow(vBP.z, 2));
+
+		glm::vec3 n;
+		float D;
+
+		(dAP < dBP) ? n = glm::normalize(vAP) : n = glm::normalize(vBP);
+		D = -glm::dot(n, _p);*/
+
+		CollisionParticlePlane(p0, p, v0, v, n, D);
+	}
+}
+
 void CollisionParticleWithSphere(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 &v) {
-	//Calculamos si la distancia entre la particula y el centro de la esfera - el Radio <=0
-	//Formula: d |C-P| = sqrt((pow((Cx - Px),2) , pow((Cy - Py),2) , pow((Cz - Pz),2))
+	// Calculamos si la distancia entre la particula y el centro de la esfera - el Radio <=0
+	// Fórmula: d |C-P| = sqrt((pow((Cx - Px),2), pow((Cy - Py),2), pow((Cz - Pz),2))
 	float d = glm::sqrt(glm::pow(Sphere::posSphere.x - p.x, 2) + glm::pow(Sphere::posSphere.y - p.y, 2) + glm::pow(Sphere::posSphere.z - p.z, 2));
-	if (d <= Sphere::radiusSphere) {
+	if (d < Sphere::radiusSphere) {
 		glm::vec3 p0p = p - p0;
 		float alfa1 = 0, alfa2 = 0, resultAlfa = 0;
 
-		//Usaremos la equación de la recta y la equacion de la esfera.
-		//Sacaremos una equiacion Ax^2 + bx + c = 0 para descubrir la alfa
+		// Usaremos la equación de la recta y la equacion de la esfera.
+		// Sacaremos una equiacion Ax^2 + bx + c = 0 para descubrir la alfa
 		float a = glm::pow(p0.x - Sphere::posSphere.x, 2) + glm::pow(p0.y - Sphere::posSphere.y, 2) + glm::pow(p0.z - Sphere::posSphere.z, 2) - glm::pow(Sphere::radiusSphere, 2) +
 			2 * ((p0.x - Sphere::posSphere.x) + (p0.y - Sphere::posSphere.y) + (p0.z - Sphere::posSphere.z));
 		float b = 2 * ((p.x - p0.x) + (p.y - p0.y) + (p.z - p0.z));
@@ -380,8 +406,8 @@ void CollisionParticleWithSphere(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::
 
 		(glm::abs(alfa1) > glm::abs(alfa2)) ? resultAlfa = alfa2 : resultAlfa = alfa1;
 
-		//hacemos la recta r= p0 + &p0p; buscaremos el valor "&".
-		//Una vez tengamos alfa conoceremos el punto de colision.
+		// recta: r = p0 + &p0p; buscaremos el valor "&".
+		// Una vez tengamos alfa conoceremos el punto de colision.
 		glm::vec3 PuntoColision = { p0.x + p0p.x *resultAlfa, p0.y + p0p.y *resultAlfa, p0.z + p0p.z *resultAlfa };
 		glm::vec3 n = glm::normalize(PuntoColision - Sphere::posSphere);
 		float D = -glm::dot(n, PuntoColision);
@@ -409,9 +435,11 @@ void CollisionParticleWithWallsAndGround(glm::vec3 p0, glm::vec3 &p, glm::vec3 v
 
 void CheckCollisions(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 &v) {
 	CollisionParticleWithWallsAndGround(p0, p, v0, v);
-	if (renderSphere){
+
+	if (renderSphere)
 		CollisionParticleWithSphere(p0, p, v0, v);
-	}
+	if (renderCapsule)
+		CollisionParticleWithCapsule(p0, p, v0, v);
 }
 
 void UpdateParticleMovement(int currParticle, float dt) {
@@ -465,7 +493,9 @@ void PhysicsUpdate(float dt) {
 
 		UpdateEmitter(dt);
 		UpdateParticles(dt);
+
 		Sphere::updateSphere(Sphere::posSphere, Sphere::radiusSphere);
+		Capsule::updateCapsule(Capsule::posACapsule, Capsule::posBCapsule, Capsule::radiusCapsule);
 	}
 }
 

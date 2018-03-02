@@ -24,9 +24,12 @@ namespace Sphere {
 }
 
 namespace Capsule {
-	extern void setupCapsule(glm::vec3 posA = glm::vec3(-3.f, 2.f, -2.f), glm::vec3 posB = glm::vec3(-4.f, 2.f, 2.f), float radius = 1.f);
+	glm::vec3 posACapsule;
+	glm::vec3 posBCapsule;
+	float radiusCapsule;
+	extern void setupCapsule(glm::vec3 posA, glm::vec3 posB, float radius);
 	extern void cleanupCapsule();
-	extern void updateCapsule(glm::vec3 posA, glm::vec3 posB, float radius = 1.f);
+	extern void updateCapsule(glm::vec3 posA, glm::vec3 posB, float radius);
 	extern void drawCapsule();
 }
 
@@ -54,7 +57,7 @@ namespace Cube {
 
 void setupPrims() {
 	Sphere::setupSphere(Sphere::posSphere, Sphere::radiusSphere);
-	Capsule::setupCapsule();
+	Capsule::setupCapsule(Capsule::posACapsule, Capsule::posBCapsule, Capsule::radiusCapsule);
 	LilSpheres::setupParticles(LilSpheres::maxParticles);
 	ClothMesh::setupClothMesh();
 	Cube::setupCube();
