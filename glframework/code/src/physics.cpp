@@ -30,7 +30,7 @@ struct Plane {
 	float D;
 };
 
-extern const int MAX_BUFFER_PARTICLES(1000);
+extern const int MAX_BUFFER_PARTICLES(5000);
 
 //bool show_test_window = false;
 
@@ -42,11 +42,13 @@ float particleLifeTimeEmitter;  //It must be >= 1.0
 int currTypeEmitter;
 glm::vec3 posEmitter;
 glm::vec3 dirEmitter;
-float angleEmitter;
-glm::vec3 finalPosEmitter;
 glm::vec3 initialSpeedEmitter;
+
+float angleFount;
+float radiusFount;
+
 int currNumParticlesCascade;
-float radioFuente;
+glm::vec3 finalPosEmitter;
 
 // ELASTICITY & FRICTION
 float elasticCoef;
@@ -94,8 +96,8 @@ void GUI() {
 
 	/// EMITER
 	if (ImGui::TreeNode("Emitter")) {
-		ImGui::DragInt("Rate", &rateParticleEmitter, 1.0f, Constants::MINIMUM_RATE_PARTICLES_EMITTER, Constants::MAXIMUM_RATE_PARTICLES_EMITTER);
-		ImGui::DragFloat("Particle life", &particleLifeTimeEmitter, 1.0f, Constants::MINIMUM_TIME_PARTICLE_LIFE, Constants::MAXIMUM_TIME_PARTICLE_LIFE);
+		ImGui::DragInt("Rate", &rateParticleEmitter, 1.0f, Constants::MIN_RATE_PARTICLES_EMITTER, Constants::MAX_RATE_PARTICLES_EMITTER);
+		ImGui::DragFloat("Particle life", &particleLifeTimeEmitter, 1.0f, Constants::MIN_TIME_PARTICLE_LIFE, Constants::MAX_TIME_PARTICLE_LIFE);
 
 		ImGui::RadioButton("Fountain", &currTypeEmitter, 0); ImGui::SameLine();
 		ImGui::RadioButton("Cascade", &currTypeEmitter, 1);
@@ -105,7 +107,7 @@ void GUI() {
 		case EnumTypeMovement::FOUNTAIN:
 			ImGui::DragFloat3("Fountain Position", &posEmitter.x);
 			ImGui::DragFloat3("Fountain Direction", &dirEmitter.x, 1.0f, -1.0f, 1.0f);
-			ImGui::DragFloat("Fountain Angle", &angleEmitter, 1.0f, Constants::MINIMUM_ANGLE_FOUNTAIN, Constants::MAXIMUM_ANGLE_FOUNTAIN);
+			ImGui::DragFloat("Fountain Angle", &angleFount, 1.0f, Constants::MIN_ANGLE_FOUNTAIN, Constants::MAX_ANGLE_FOUNTAIN);
 			break;
 
 		case EnumTypeMovement::CASCADE:
@@ -165,16 +167,18 @@ void GUI() {
 }
 
 void InitEmitter() {
-	rateParticleEmitter = Constants::MINIMUM_RATE_PARTICLES_EMITTER;
-	particleLifeTimeEmitter = Constants::MINIMUM_TIME_PARTICLE_LIFE;
+	rateParticleEmitter = Constants::MIN_RATE_PARTICLES_EMITTER;
+	particleLifeTimeEmitter = Constants::MIN_TIME_PARTICLE_LIFE;
 	currTypeEmitter = (int)EnumTypeMovement::FOUNTAIN;
-	radioFuente = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / Constants::MAXIMUM_RADIUS_FOUNTAIN));
-	posEmitter = { 0.0f, 2.5f, 0.0f };
-	dirEmitter = { 0.0f, 0.3f, 0.3f };
-	angleEmitter = Constants::MINIMUM_ANGLE_FOUNTAIN;
-	finalPosEmitter = { 2.0f, 2.5f, 0.0f };
+	posEmitter = { 0.0f, 1.5f, 0.0f };
+	dirEmitter = Constants::DEFAULT_DIR_PARTICLES;
+	initialSpeedEmitter = Constants::DEFAULT_SPEED_PARTICLES;
+
+	angleFount = Constants::MIN_ANGLE_FOUNTAIN;
+	radiusFount = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / Constants::MAX_RADIUS_FOUNTAIN));
+
 	currNumParticlesCascade = 0;
-	initialSpeedEmitter = Constants::INITIAL_SPEED_PARTICLES;
+	finalPosEmitter = { 1.0f, 2.5f, 1.0f };
 }
 
 void InitColliders() {
@@ -251,89 +255,74 @@ void PhysicsInit() {
 	ptrSpeedParticles = new glm::vec3[MAX_BUFFER_PARTICLES]{ acceleration };
 
 	InitPlanes();
-
-
-
 }
 
-void NewParticle(int currTypeEmitter) {
-	if (numParticlesEnabled < MAX_BUFFER_PARTICLES - 1) {
-		particlesLifeTime[endIndexParticlesToDraw] = particleLifeTimeEmitter;
+void EnableParticle() {
+	particlesLifeTime[endIndexParticlesToDraw] = particleLifeTimeEmitter;
+	endIndexParticlesToDraw = (endIndexParticlesToDraw + 1) % MAX_BUFFER_PARTICLES;
+	numParticlesEnabled++;
+}
 
-		glm::vec3 initialDir;
-		glm::vec3 newPos;
+void NewFountainParticles() {
+	glm::vec3 v0;
+	float deltaCircumAngle = 360.0f / Constants::NUM_PARTICLES_FOUNTAIN;
+	float currCircumAngle = 0.0f;
 
-		switch (static_cast<EnumTypeMovement>(currTypeEmitter)) {
-		case EnumTypeMovement::FOUNTAIN: // TODO
+	for (int i = 0; i < Constants::NUM_PARTICLES_FOUNTAIN && numParticlesEnabled < MAX_BUFFER_PARTICLES - 1; i++) {
+		currCircumAngle += deltaCircumAngle;
+		v0.x = cos(currCircumAngle) * radiusFount;
+		v0.y = (radiusFount / -tan(angleFount)) + Constants::DEFAULT_SPEED_PARTICLES.y;
+		v0.z = sin(currCircumAngle) * radiusFount;
 
-			//Posicion, Direccion, Angulo
-			
-			//static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / Constants::MAXIMUM_RADIUS_FOUNTAIN));
-			// X = posEmitter.x + cos(angulo)
-			// Y = posEmitter.y + tan(angulo)
-			// Z = posEmitter.z + sin(angulo)
+		ptrPosParticles[endIndexParticlesToDraw] = posEmitter;
+		ptrSpeedParticles[endIndexParticlesToDraw] = v0 + dirEmitter; //
 
-			//Buscamos Vector Velocidad Inicial
-			// Altura = tan(angulo) * radio;
-			// vel.y = altura * dir
-			
-
-
-			initialDir.x =  cos(angleEmitter);
-			initialDir.y =  sin(angleEmitter);
-
-			
-
-
-			ptrPosParticles[endIndexParticlesToDraw] = posEmitter;
-			ptrSpeedParticles[endIndexParticlesToDraw] = initialSpeedEmitter * initialDir;
-
-
-			break;
-
-		case EnumTypeMovement::CASCADE:
-			newPos.x = (finalPosEmitter.x - posEmitter.x) / Constants::MAXIMUM_PARTICLES_CASCADE;
-			newPos.y = (finalPosEmitter.y - posEmitter.y) / Constants::MAXIMUM_PARTICLES_CASCADE;
-			newPos.z = (finalPosEmitter.z - posEmitter.z) / Constants::MAXIMUM_PARTICLES_CASCADE;
-
-			currNumParticlesCascade = (currNumParticlesCascade + 1) % Constants::MAXIMUM_PARTICLES_CASCADE;
-			newPos *= (currNumParticlesCascade + 1);
-			newPos += posEmitter;
-
-			ptrPosParticles[endIndexParticlesToDraw] = newPos;
-			ptrSpeedParticles[endIndexParticlesToDraw] = initialSpeedEmitter;
-
-			break;
-
-		default:
-			break;
-		}
-		
-		endIndexParticlesToDraw = (endIndexParticlesToDraw + 1) % MAX_BUFFER_PARTICLES;
-		numParticlesEnabled++;
+		EnableParticle();
 	}
 }
 
-void UpdateEmitter(float dt) {
-	// Spawn at specified time
-	int numParticlesToEnable = static_cast<int>(dt * rateParticleEmitter);
-	for (int i = 0; i < numParticlesToEnable && numParticlesEnabled < MAX_BUFFER_PARTICLES - 1; i++) {
+void NewCascadeParticles() {
+	glm::vec3 x0;
+	for (int i = 0; i < Constants::NUM_PARTICLES_CASCADE && numParticlesEnabled < MAX_BUFFER_PARTICLES - 1; i++) {
+		x0.x = (finalPosEmitter.x - posEmitter.x) / Constants::NUM_PARTICLES_CASCADE;
+		x0.y = (finalPosEmitter.y - posEmitter.y) / Constants::NUM_PARTICLES_CASCADE;
+		x0.z = (finalPosEmitter.z - posEmitter.z) / Constants::NUM_PARTICLES_CASCADE;
+
+		currNumParticlesCascade = (currNumParticlesCascade + 1) % Constants::NUM_PARTICLES_CASCADE;
+		x0 *= (currNumParticlesCascade + 1);
+		x0 += posEmitter;
+
+		ptrPosParticles[endIndexParticlesToDraw] = x0;
+		ptrSpeedParticles[endIndexParticlesToDraw] = initialSpeedEmitter;
+
+		EnableParticle();
+	}
+}
+
+void NewParticles(int currTypeEmitter) {
+	if (numParticlesEnabled < MAX_BUFFER_PARTICLES - 1) {
 		switch (static_cast<EnumTypeMovement>(currTypeEmitter)) {
 		case EnumTypeMovement::FOUNTAIN:
-			for (int i = 0; i < Constants::MAXIMUM_PARTICLES_FOUNTAIN && numParticlesEnabled < MAX_BUFFER_PARTICLES - 1; i++) {
-				NewParticle(currTypeEmitter);
-			}
+			NewFountainParticles();
 			break;
 
 		case EnumTypeMovement::CASCADE:
-			for (int i = 0; i < Constants::MAXIMUM_PARTICLES_CASCADE && numParticlesEnabled < MAX_BUFFER_PARTICLES - 1; i++) {
-				NewParticle(currTypeEmitter);
-			}
+			NewCascadeParticles();
 			break;
 
 		default:
 			break;
 		}
+	}
+}
+
+/*
+ * Spawn at specified time
+ */
+void UpdateEmitter(float dt) {
+	int numParticlesToEnable = static_cast<int>(dt * rateParticleEmitter);
+	for (int i = 0; i < numParticlesToEnable && numParticlesEnabled < MAX_BUFFER_PARTICLES - 1; i++) {
+		NewParticles(currTypeEmitter);
 	}
 }
 

@@ -2,22 +2,23 @@
 
 namespace Constants {
 	// EMITTER
-	extern const int MINIMUM_RATE_PARTICLES_EMITTER(100);
-	extern const int MAXIMUM_RATE_PARTICLES_EMITTER(500);
-	extern const float MINIMUM_TIME_PARTICLE_LIFE(15.0f);
-	extern const float MAXIMUM_TIME_PARTICLE_LIFE(60.0f);
+	extern const int   MIN_RATE_PARTICLES_EMITTER(100);
+	extern const int   MAX_RATE_PARTICLES_EMITTER(500);
+	extern const float MIN_TIME_PARTICLE_LIFE(15.0f);
+	extern const float MAX_TIME_PARTICLE_LIFE(60.0f);
 
 	// FOUNTAIN
-	extern const float MINIMUM_ANGLE_FOUNTAIN(75.0f);
-	extern const float MAXIMUM_ANGLE_FOUNTAIN(115.0f);
-	extern const int MAXIMUM_PARTICLES_FOUNTAIN(20);
-	extern const float MAXIMUM_RADIUS_FOUNTAIN(3.0f);
+	extern const float MIN_ANGLE_FOUNTAIN(30.0f);
+	extern const float MAX_ANGLE_FOUNTAIN(75.0f);
+	extern const int   NUM_PARTICLES_FOUNTAIN(10);
+	extern const float MAX_RADIUS_FOUNTAIN(7.0f);
 
 	// CASCADE
-	extern const int MAXIMUM_PARTICLES_CASCADE(20);
+	extern const int NUM_PARTICLES_CASCADE(20);
 
 	// PARTICLES
-	extern const glm::vec3 INITIAL_SPEED_PARTICLES(2.0f, 2.0f, 2.0f);
+	extern const glm::vec3 DEFAULT_DIR_PARTICLES(0.0f, 1.0f, 0.0f);
+	extern const glm::vec3 DEFAULT_SPEED_PARTICLES(1.0f, 1.0f, 1.0f);
 
 	// FORCES
 	extern const glm::vec3 GRAVITY(0.0f, -9.81f, 0.0f);
