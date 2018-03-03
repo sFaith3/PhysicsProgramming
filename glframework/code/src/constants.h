@@ -29,13 +29,15 @@ namespace Constants {
 	// COLLIDER CAPSULE
 	extern const glm::vec3 DEFAULT_POS_A_CAPSULE;
 	extern const glm::vec3 DEFAULT_POS_B_CAPSULE;
-	extern const float MIN_RADIUS_CAPSULE;
-	extern const float MAX_RADIUS_CAPSULE;
-	extern const float DEFAULT_RADIUS_CAPSULE;
+	extern const float	   MIN_RADIUS_CAPSULE;
+	extern const float	   MAX_RADIUS_CAPSULE;
+	extern const float	   DEFAULT_RADIUS_CAPSULE;
 
 	// FORCES
 	extern const glm::vec3 GRAVITY;
 
 	extern const int FACES_CUBE;
+
+	extern const float MAX_ANGLE_CIRCUM;
 }
 #endif

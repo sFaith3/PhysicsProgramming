@@ -117,8 +117,6 @@ void GUI() {
 			ImGui::DragFloat3("Cascade Position A", &posEmitter.x);
 			ImGui::DragFloat3("Cascade Position B", &finalPosEmitter.x);
 			ImGui::DragFloat3("Cascade Velocity", &initialSpeedEmitter.x);
-
-			//currNumParticlesCascade = 0;
 			break;
 
 		default:
@@ -268,7 +266,7 @@ void EnableParticle() {
 
 void NewFountainParticles() {
 	glm::vec3 v0;
-	float deltaCircumAngle = 360.0f / Constants::NUM_PARTICLES_FOUNTAIN;
+	float deltaCircumAngle = Constants::MAX_ANGLE_CIRCUM / Constants::NUM_PARTICLES_FOUNTAIN;
 	float currCircumAngle = 0.0f;
 
 	for (int i = 0; i < Constants::NUM_PARTICLES_FOUNTAIN && numParticlesEnabled < MAX_BUFFER_PARTICLES - 1; i++) {
@@ -324,7 +322,7 @@ void NewParticles(int currTypeEmitter) {
  */
 void UpdateEmitter(float dt) {
 	int numParticlesToEnable = static_cast<int>(dt * rateParticleEmitter);
-	for (int i = 0; i < numParticlesToEnable && numParticlesEnabled < MAX_BUFFER_PARTICLES - 1; i++) {
+	for (int i = 0; i < numParticlesToEnable && numParticlesEnabled <= MAX_BUFFER_PARTICLES - 1; i++) {
 		NewParticles(currTypeEmitter);
 	}
 }
@@ -360,23 +358,42 @@ void CollisionParticlePlane(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 
 }
 
 void CollisionParticleWithCapsule(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 &v) {
-	// P' = B + Clamp((p - B) * (B - A), 0, 1) * (B - A)
-	// d = |P - P'|
-	glm::vec3 _p = Capsule::posBCapsule + glm::clamp((p0 - Capsule::posBCapsule) * (Capsule::posBCapsule - Capsule::posACapsule), 0.0f, 1.0f);
-	float d = glm::sqrt(glm::pow(p0.x - _p.x, 2) + glm::pow(p0.y - _p.y, 2) + glm::pow(p0.z - _p.z, 2));
+	// P'  = B + ((P - B) * (B - A)) * (B - A)
+	// P'' = B + Clamp((P - B) * (B - A), 0, 1) * (B - A)
+	// d(Cap, Particle) = |P - P'|
+	glm::vec3 B = Capsule::posBCapsule;
+	glm::vec3 BP = p - B;
+	glm::vec3 AB = B - Capsule::posACapsule;
 
-	if (d < Capsule::radiusCapsule) { // TODO Rebote
-		/*glm::vec3 vAP = p - Capsule::posACapsule;
-		glm::vec3 vBP = p - Capsule::posBCapsule;
+	glm::vec3 P_ = B + (BP * AB) * AB;
+	glm::vec3 P__ = B + glm::clamp((BP * AB), 0.0f, 1.0f) * AB;
 
-		float dAP = glm::sqrt(glm::pow(vAP.x, 2) + glm::pow(vAP.y, 2) + glm::pow(vAP.z, 2));
-		float dBP = glm::sqrt(glm::pow(vBP.x, 2) + glm::pow(vBP.y, 2) + glm::pow(vBP.z, 2));
+	float d = glm::sqrt(glm::pow(p.x - P_.x , 2) + glm::pow(p.y - P_.y, 2) + glm::pow(p.z - P_.z, 2));
 
-		glm::vec3 n;
-		float D;
+	if (d < Capsule::radiusCapsule) {
+		// Get collision point
+		glm::vec3 PC;
 
-		(dAP < dBP) ? n = glm::normalize(vAP) : n = glm::normalize(vBP);
-		D = -glm::dot(n, _p);*/
+		/// To calculate tangent plane at collision point in a don't flat surface
+		// Equation of the line r: A + AB(alfa) = P'
+		glm::vec3 A = Capsule::posACapsule;
+		glm::vec3 AB = Capsule::posBCapsule - A;
+
+		// To get "alfa" to do vector PP' and PP' x u = PP' x AB
+		glm::vec3 PC_P = A - PC;
+		glm::vec3 PC_P_alfa = AB;
+
+		float x = glm::dot(PC_P, AB);
+		float y = glm::dot(PC_P_alfa, AB);
+
+		// x + y(alfa) = 0 -> alfa = -x / y
+		float alfa = -x / y;
+
+		// Replace "landa" at equation of the line to get P', where P' = _P
+		glm::vec3 _P = A + (AB * alfa);
+
+		glm::vec3 n = glm::normalize(PC - _P);
+		float D = -glm::dot(n, PC);
 
 		CollisionParticlePlane(p0, p, v0, v, n, D);
 	}
@@ -424,8 +441,8 @@ void CollisionParticleWithWallsAndGround(glm::vec3 p0, glm::vec3 &p, glm::vec3 v
 	for (int i = 0; i < Constants::FACES_CUBE; i++) {
 		currPlane = planes[i];
 		n = currPlane.normal;
-		d = (glm::dot(n, p) + currPlane.D) * (glm::dot(n, p0) + currPlane.D);
 
+		d = (glm::dot(n, p) + currPlane.D) * (glm::dot(n, p0) + currPlane.D);
 		if (d < 0.0f) {
 			CollisionParticlePlane(p0, p, v0, v, n, currPlane.D);
 			break;
