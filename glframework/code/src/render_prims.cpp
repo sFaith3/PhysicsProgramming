@@ -78,7 +78,7 @@ void renderPrims() {
 
 	if (renderParticles) {
 		if (endIndexParticlesToDraw - startDrawingFromParticle < 0) {
-			LilSpheres::drawParticles(startDrawingFromParticle, Constants::MAX_RATE_PARTICLES_EMITTER - startDrawingFromParticle);
+			LilSpheres::drawParticles(startDrawingFromParticle, Constants::MAX_BUFFER_PARTICLES - startDrawingFromParticle);
 			LilSpheres::drawParticles(0, endIndexParticlesToDraw);
 		}
 		else {

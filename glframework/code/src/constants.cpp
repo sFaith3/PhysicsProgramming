@@ -18,6 +18,7 @@ namespace Constants {
 	extern const int NUM_PARTICLES_CASCADE(20);
 
 	// PARTICLES
+	extern const int	   MAX_BUFFER_PARTICLES(5000);
 	extern const glm::vec3 DEFAULT_DIR_PARTICLES(0.0f, 1.0f, 0.0f);
 	extern const glm::vec3 DEFAULT_SPEED_PARTICLES(1.0f, 1.0f, 1.0f);
 
