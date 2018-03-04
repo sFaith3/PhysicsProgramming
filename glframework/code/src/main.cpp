@@ -81,9 +81,11 @@ int main(int argc, char** argv) {
 
 	int display_w, display_h;
 	SDL_GL_GetDrawableSize(mainwindow, &display_w, &display_h);
+
 	// Init scene
 	GLinit(display_w, display_h);
 	PhysicsInit();
+
 	// Setup ImGui binding
 	ImGui_ImplSdlGL3_Init(mainwindow);
 
@@ -123,8 +125,11 @@ int main(int argc, char** argv) {
 	}
 
 	ImGui_ImplSdlGL3_Shutdown();
+	PhysicsCleanup();
+
 	SDL_GL_DeleteContext(maincontext);
 	SDL_DestroyWindow(mainwindow);
 	SDL_Quit();
+
 	return 0;
 }

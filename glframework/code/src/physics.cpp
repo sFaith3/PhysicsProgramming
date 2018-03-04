@@ -36,29 +36,32 @@ struct Plane {
 	float D;
 };
 
-extern const int MAX_BUFFER_PARTICLES(5000);
+extern const int MAX_BUFFER_PARTICLES(SHRT_MAX / 3);
 
 //bool show_test_window = false;
 
 bool playingSimulation;
 
 // EMITTER
-int rateParticleEmitter;		//It must be >= 100
-float particleLifeTimeEmitter;  //It must be >= 1.0
-int currTypeEmitter;
-glm::vec3 posEmitter;
-glm::vec3 dirEmitter;
-glm::vec3 initialSpeedEmitter;
+int emitterRateParticle;		//It must be >= 100
+float emitterParticleLifeTime;  //It must be >= 1.0
+int emitterCurrType;
+glm::vec3 emitterPos;
+glm::vec3 emitterDir;
+glm::vec3 emitterInitialSpeed;
 
-float angleFount;
-float radiusFount;
+float fountAngle;
+float fountRadius;
+const float deltaCircumAngle = Constants::MAX_ANGLE_CIRCUM / Constants::NUM_PARTICLES_FOUNTAIN + 1;
+float currCircumAngle;
+int fountCurrNumParticles;
 
-int currNumParticlesCascade;
-glm::vec3 finalPosEmitter;
+glm::vec3 emitterFinalPos;
+int cascadeCurrNumParticles;
 
 // ELASTICITY & FRICTION
-float elasticCoef;
-float frictionCoef;
+float coefElastic;
+float coefFriction;
 
 // SPHERE COLLIDER
 extern bool renderSphere;
@@ -76,8 +79,8 @@ extern int startDrawingFromParticle;
 extern int endIndexParticlesToDraw;
 
 float particlesLifeTime[MAX_BUFFER_PARTICLES];
-glm::vec3 *ptrPosParticles;	  // Posiciones de las partículas
-glm::vec3 *ptrSpeedParticles; // Velocidades de las partículas
+glm::vec3 *ptrParticlesPos = new glm::vec3[MAX_BUFFER_PARTICLES]{ glm::vec3(0.0f, 0.0f, 0.0f) }; // Posiciones de las partículas
+glm::vec3 *ptrParticlesSpeed = new glm::vec3[MAX_BUFFER_PARTICLES]{ acceleration };				 // Velocidades de las partículas
 
 std::vector<Plane> planes;
 
@@ -93,30 +96,29 @@ void GUI() {
 
 	ImGui::Checkbox("Play Simulation", &playingSimulation);
 	if (ImGui::Button("Reset Simulation")) {
-		PhysicsCleanup();
 		PhysicsInit();
 	}
 
 	/// EMITER
 	if (ImGui::TreeNode("Emitter")) {
-		ImGui::DragInt("Rate", &rateParticleEmitter, 1.0f, Constants::MIN_RATE_PARTICLES_EMITTER, Constants::MAX_RATE_PARTICLES_EMITTER);
-		ImGui::DragFloat("Particle life", &particleLifeTimeEmitter, 1.0f, Constants::MIN_TIME_PARTICLE_LIFE, Constants::MAX_TIME_PARTICLE_LIFE);
-
-		ImGui::RadioButton("Fountain", &currTypeEmitter, 0); ImGui::SameLine();
-		ImGui::RadioButton("Cascade", &currTypeEmitter, 1);
+		ImGui::DragInt("Rate", &emitterRateParticle, 1.0f, Constants::MIN_RATE_PARTICLES_EMITTER, Constants::MAX_RATE_PARTICLES_EMITTER);
+		ImGui::DragFloat("Particle life", &emitterParticleLifeTime, 1.0f, Constants::MIN_TIME_PARTICLE_LIFE, Constants::MAX_TIME_PARTICLE_LIFE);
 
 		/// FOUNTAIN & CASCADE
-		switch (static_cast<EnumTypeMovement>(currTypeEmitter)) {
+		ImGui::RadioButton("Fountain", &emitterCurrType, 0); ImGui::SameLine();
+		ImGui::RadioButton("Cascade", &emitterCurrType, 1);
+
+		switch (static_cast<EnumTypeMovement>(emitterCurrType)) {
 		case EnumTypeMovement::FOUNTAIN:
-			ImGui::DragFloat3("Fountain Position", &posEmitter.x);
-			ImGui::DragFloat3("Fountain Direction", &dirEmitter.x, 1.0f, -1.0f, 1.0f);
-			ImGui::DragFloat("Fountain Angle", &angleFount, 1.0f, Constants::MIN_ANGLE_FOUNTAIN, Constants::MAX_ANGLE_FOUNTAIN);
+			ImGui::DragFloat3("Fountain Position", &emitterPos.x);
+			ImGui::DragFloat3("Fountain Direction", &emitterDir.x, 1.0f, -1.0f, 1.0f);
+			ImGui::DragFloat("Fountain Angle", &fountAngle, 1.0f, Constants::MIN_ANGLE_FOUNTAIN, Constants::MAX_ANGLE_FOUNTAIN);
 			break;
 
 		case EnumTypeMovement::CASCADE:
-			ImGui::DragFloat3("Cascade Position A", &posEmitter.x);
-			ImGui::DragFloat3("Cascade Position B", &finalPosEmitter.x);
-			ImGui::DragFloat3("Cascade Velocity", &initialSpeedEmitter.x);
+			ImGui::DragFloat3("Cascade Position A", &emitterPos.x);
+			ImGui::DragFloat3("Cascade Position B", &emitterFinalPos.x);
+			ImGui::DragFloat3("Cascade Velocity", &emitterInitialSpeed.x);
 			break;
 
 		default:
@@ -128,8 +130,8 @@ void GUI() {
 
 	/// ELASTICITY & FRICTION
 	if (ImGui::TreeNode("Elasticity & Friction")) {
-		ImGui::DragFloat("Elastic Coefficient", &elasticCoef, 1.0f, 0.0f, 1.0f);
-		ImGui::DragFloat("Friction Coefficient", &frictionCoef, 1.0f, 0.0f, 1.0f);
+		ImGui::DragFloat("Elastic Coefficient", &coefElastic, 1.0f, 0.0f, 1.0f);
+		ImGui::DragFloat("Friction Coefficient", &coefFriction, 1.0f, 0.0f, 1.0f);
 
 		ImGui::TreePop();
 	}
@@ -168,18 +170,20 @@ void GUI() {
 }
 
 void InitEmitter() {
-	rateParticleEmitter = Constants::MIN_RATE_PARTICLES_EMITTER;
-	particleLifeTimeEmitter = Constants::MIN_TIME_PARTICLE_LIFE;
-	currTypeEmitter = (int)EnumTypeMovement::FOUNTAIN;
-	posEmitter = { 0.0f, 1.5f, 0.0f };
-	dirEmitter = Constants::DEFAULT_DIR_PARTICLES;
-	initialSpeedEmitter = Constants::DEFAULT_SPEED_PARTICLES;
+	emitterRateParticle = Constants::MIN_RATE_PARTICLES_EMITTER;
+	emitterParticleLifeTime = Constants::MIN_TIME_PARTICLE_LIFE;
+	emitterCurrType = (int)EnumTypeMovement::FOUNTAIN;
+	emitterPos = { 0.0f, 1.5f, 0.0f };
+	emitterDir = Constants::DEFAULT_DIR_PARTICLES;
+	emitterInitialSpeed = Constants::DEFAULT_SPEED_PARTICLES;
 
-	angleFount = Constants::MIN_ANGLE_FOUNTAIN;
-	radiusFount = Constants::MIN_RADIUS_FOUNTAIN + (rand() % static_cast<int>(Constants::MAX_RADIUS_FOUNTAIN - Constants::MIN_RADIUS_FOUNTAIN + 1));
+	fountAngle = Constants::MIN_ANGLE_FOUNTAIN;
+	fountRadius = Constants::MIN_RADIUS_FOUNTAIN + (rand() % static_cast<int>(Constants::MAX_RADIUS_FOUNTAIN - Constants::MIN_RADIUS_FOUNTAIN + 1));
+	currCircumAngle = 0.0f;
+	fountCurrNumParticles = 0;
 
-	currNumParticlesCascade = 0;
-	finalPosEmitter = { 1.0f, 2.5f, 1.0f };
+	emitterFinalPos = { 1.0f, 2.5f, 1.0f };
+	cascadeCurrNumParticles = 0;
 }
 
 void InitColliders() {
@@ -238,8 +242,8 @@ void PhysicsInit() {
 	InitEmitter();
 
 	// ELASTICITY & FRICTION
-	elasticCoef = 1.0f;
-	frictionCoef = 0.0f;
+	coefElastic = 1.0f;
+	coefFriction = 0.0f;
 
 	InitColliders();
 
@@ -252,31 +256,33 @@ void PhysicsInit() {
 	startDrawingFromParticle = 0;
 	numParticlesEnabled = 0;
 
-	ptrPosParticles = new glm::vec3[MAX_BUFFER_PARTICLES]{ glm::vec3(0.0f, 0.0f, 0.0f) };
-	ptrSpeedParticles = new glm::vec3[MAX_BUFFER_PARTICLES]{ acceleration };
-
 	InitPlanes();
 }
 
+/*
+ * Do it after to initialize his variables
+ */
 void EnableParticle() {
-	particlesLifeTime[endIndexParticlesToDraw] = particleLifeTimeEmitter;
+	particlesLifeTime[endIndexParticlesToDraw] = emitterParticleLifeTime;
 	endIndexParticlesToDraw = (endIndexParticlesToDraw + 1) % MAX_BUFFER_PARTICLES;
 	numParticlesEnabled++;
 }
 
 void NewFountainParticles() {
 	glm::vec3 v0;
-	float deltaCircumAngle = Constants::MAX_ANGLE_CIRCUM / Constants::NUM_PARTICLES_FOUNTAIN;
-	float currCircumAngle = 0.0f;
-
-	for (int i = 0; i < Constants::NUM_PARTICLES_FOUNTAIN && numParticlesEnabled < MAX_BUFFER_PARTICLES - 1; i++) {
+	if (numParticlesEnabled < MAX_BUFFER_PARTICLES) {
+		v0.x = cos(currCircumAngle) * fountRadius;
+		v0.y = sin(fountAngle) * Constants::DEFAULT_SPEED_PARTICLES.y;
+		v0.z = sin(currCircumAngle) * fountRadius;
 		currCircumAngle += deltaCircumAngle;
-		v0.x = cos(currCircumAngle) * radiusFount;
-		v0.y = (radiusFount / -tan(angleFount)) + Constants::DEFAULT_SPEED_PARTICLES.y;
-		v0.z = sin(currCircumAngle) * radiusFount;
 
-		ptrPosParticles[endIndexParticlesToDraw] = posEmitter;
-		ptrSpeedParticles[endIndexParticlesToDraw] = v0 + dirEmitter;
+		fountCurrNumParticles = (fountCurrNumParticles + 1) % Constants::NUM_PARTICLES_FOUNTAIN;
+		if (fountCurrNumParticles == 0) {
+			currCircumAngle = 0.0f;
+		}
+
+		ptrParticlesPos[endIndexParticlesToDraw] = emitterPos;
+		ptrParticlesSpeed[endIndexParticlesToDraw] = v0 + emitterDir;
 
 		EnableParticle();
 	}
@@ -284,25 +290,22 @@ void NewFountainParticles() {
 
 void NewCascadeParticles() {
 	glm::vec3 x0;
-	for (int i = 0; i < Constants::NUM_PARTICLES_CASCADE && numParticlesEnabled < MAX_BUFFER_PARTICLES - 1; i++) {
-		x0.x = (finalPosEmitter.x - posEmitter.x) / Constants::NUM_PARTICLES_CASCADE;
-		x0.y = (finalPosEmitter.y - posEmitter.y) / Constants::NUM_PARTICLES_CASCADE;
-		x0.z = (finalPosEmitter.z - posEmitter.z) / Constants::NUM_PARTICLES_CASCADE;
+	if (numParticlesEnabled < MAX_BUFFER_PARTICLES) {
+		x0 = (emitterFinalPos - emitterPos) / glm::vec3(Constants::NUM_PARTICLES_CASCADE);
+		x0 *= (cascadeCurrNumParticles + 1);
+		x0 += emitterPos;
+		cascadeCurrNumParticles = (cascadeCurrNumParticles + 1) % Constants::NUM_PARTICLES_CASCADE;
 
-		currNumParticlesCascade = (currNumParticlesCascade + 1) % Constants::NUM_PARTICLES_CASCADE;
-		x0 *= (currNumParticlesCascade + 1);
-		x0 += posEmitter;
-
-		ptrPosParticles[endIndexParticlesToDraw] = x0;
-		ptrSpeedParticles[endIndexParticlesToDraw] = initialSpeedEmitter;
+		ptrParticlesPos[endIndexParticlesToDraw] = x0;
+		ptrParticlesSpeed[endIndexParticlesToDraw] = emitterInitialSpeed;
 
 		EnableParticle();
 	}
 }
 
-void NewParticles(int currTypeEmitter) {
+void NewParticles(int emitterCurrType) {
 	if (numParticlesEnabled < MAX_BUFFER_PARTICLES - 1) {
-		switch (static_cast<EnumTypeMovement>(currTypeEmitter)) {
+		switch (static_cast<EnumTypeMovement>(emitterCurrType)) {
 		case EnumTypeMovement::FOUNTAIN:
 			NewFountainParticles();
 			break;
@@ -321,9 +324,9 @@ void NewParticles(int currTypeEmitter) {
  * Spawn at specified time
  */
 void UpdateEmitter(float dt) {
-	int numParticlesToEnable = static_cast<int>(dt * rateParticleEmitter);
-	for (int i = 0; i < numParticlesToEnable && numParticlesEnabled <= MAX_BUFFER_PARTICLES - 1; i++) {
-		NewParticles(currTypeEmitter);
+	int numParticlesToEnable = static_cast<int>(dt * emitterRateParticle);
+	for (int i = 0; i < numParticlesToEnable && numParticlesEnabled < MAX_BUFFER_PARTICLES; i++) {
+		NewParticles(emitterCurrType);
 	}
 }
 
@@ -348,13 +351,13 @@ void CollisionParticlePlane(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 
 	v0 = v;
 
 	// With Elasticity
-	p = p0 - (1 + elasticCoef) * (glm::dot(n, p0) + d) * n;
-	v = v0 - (1 + elasticCoef) * glm::dot(n, v0) * n;
+	p = p0 - (1 + coefElastic) * (glm::dot(n, p0) + d) * n;
+	v = v0 - (1 + coefElastic) * glm::dot(n, v0) * n;
 
 	// With Friction
 	glm::vec3 vn = glm::dot(n, v) * n;
 	glm::vec3 vt = v - vn;
-	v = v - (frictionCoef * vt);
+	v = v - (coefFriction * vt);
 }
 
 void CollisionParticleWithCapsule(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 &v) {
@@ -460,8 +463,8 @@ void CheckCollisions(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 &v) {
 }
 
 void UpdateParticleMovement(int currParticle, float dt) {
-	glm::vec3 p0 = ptrPosParticles[currParticle];
-	glm::vec3 v0 = ptrSpeedParticles[currParticle];
+	glm::vec3 p0 = ptrParticlesPos[currParticle];
+	glm::vec3 v0 = ptrParticlesSpeed[currParticle];
 
 	// Euler Method
 	glm::vec3 p = p0 + dt * v0;
@@ -469,8 +472,8 @@ void UpdateParticleMovement(int currParticle, float dt) {
 
 	CheckCollisions(p0, p, v0, v);
 
-	ptrPosParticles[currParticle] = p;
-	ptrSpeedParticles[currParticle] = v;
+	ptrParticlesPos[currParticle] = p;
+	ptrParticlesSpeed[currParticle] = v;
 }
 
 /*
@@ -489,8 +492,8 @@ void UpdateParticles(float dt) {
 			}
 		}
 
-		LilSpheres::updateParticles(startDrawingFromParticle, MAX_BUFFER_PARTICLES - startDrawingFromParticle, (float*)&ptrPosParticles[startDrawingFromParticle]);
-		LilSpheres::updateParticles(0, endIndexParticlesToDraw, (float*)&ptrPosParticles[0]);
+		LilSpheres::updateParticles(startDrawingFromParticle, MAX_BUFFER_PARTICLES - startDrawingFromParticle, (float*)&ptrParticlesPos[startDrawingFromParticle]);
+		LilSpheres::updateParticles(0, endIndexParticlesToDraw, (float*)&ptrParticlesPos[0]);
 	}
 	else {
 		for (int i = startDrawingFromParticle; i < endIndexParticlesToDraw; i++) {
@@ -498,7 +501,7 @@ void UpdateParticles(float dt) {
 				UpdateParticleMovement(i, dt);
 			}
 		}
-		LilSpheres::updateParticles(startDrawingFromParticle, numParticlesEnabled, (float*)&ptrPosParticles[startDrawingFromParticle]);
+		LilSpheres::updateParticles(startDrawingFromParticle, numParticlesEnabled, (float*)&ptrParticlesPos[startDrawingFromParticle]);
 	}
 }
 
@@ -517,6 +520,6 @@ void PhysicsUpdate(float dt) {
 }
 
 void PhysicsCleanup() {
-	delete[] ptrPosParticles;
-	delete[] ptrSpeedParticles;
+	delete[] ptrParticlesPos;
+	delete[] ptrParticlesSpeed;
 }
