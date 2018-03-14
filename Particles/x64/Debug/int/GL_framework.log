@@ -1,5 +1,17 @@
-﻿C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\VCTargets\Microsoft.CppBuild.targets(387,5): warning MSB8028: The intermediate directory (C:\Users\sergisanchezsolares\Documents\Mecanica_P1\Particles\x64\Debug\int\) contains files shared from another project (GL_framework.vcxproj).  This can lead to incorrect clean and rebuild behavior.
-  GL_framework.vcxproj -> C:\Users\sergisanchezsolares\Documents\Mecanica_P1\Particles\x64\Debug\Practica1_Particulas.exe
-  GL_framework.vcxproj -> C:\Users\sergisanchezsolares\Documents\Mecanica_P1\Particles\x64\Debug\Practica1_Particulas.pdb (Partial PDB)
+﻿C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\VCTargets\Microsoft.CppBuild.targets(387,5): warning MSB8028: The intermediate directory (C:\Users\samuelbalcellsvaldiv\Documents\Mecànica\Particles\x64\Debug\int\) contains files shared from another project (GL_framework.vcxproj, Practica1_Particulas.vcxproj).  This can lead to incorrect clean and rebuild behavior.
+  render_prims.cpp
+  render.cpp
+  physics.cpp
+c:\users\samuelbalcellsvaldiv\documents\mecànica\particles\code\src\physics.cpp(294): warning C4244: 'argument': conversion from 'const int' to 'float', possible loss of data
+  main.cpp
+  constants.cpp
+  imgui_impl_sdl_gl3.cpp
+  imgui_draw.cpp
+  imgui_demo.cpp
+  imgui.cpp
+  Generating Code...
+     Creating library C:\Users\samuelbalcellsvaldiv\Documents\Mecànica\Particles\x64\Debug\Particles.lib and object C:\Users\samuelbalcellsvaldiv\Documents\Mecànica\Particles\x64\Debug\Particles.exp
+  GL_framework.vcxproj -> C:\Users\samuelbalcellsvaldiv\Documents\Mecànica\Particles\x64\Debug\Particles.exe
+  GL_framework.vcxproj -> C:\Users\samuelbalcellsvaldiv\Documents\Mecànica\Particles\x64\Debug\Particles.pdb (Partial PDB)
   0 File(s) copied
   0 File(s) copied

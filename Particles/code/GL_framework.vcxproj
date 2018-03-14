@@ -22,7 +22,7 @@
     <ProjectGuid>{E94E96AC-5E3D-408F-AF48-2152C9BD4214}</ProjectGuid>
     <RootNamespace>GL_framework</RootNamespace>
     <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
-    <ProjectName>Practica1_Particulas</ProjectName>
+    <ProjectName>Particles</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

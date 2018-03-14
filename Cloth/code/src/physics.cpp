@@ -3,6 +3,8 @@
 #include <glm/glm.hpp>
 #include <iostream>
 using namespace std;
+
+
 namespace ClothMesh {
 	 void setupClothMesh();
 	 void cleanupClothMesh();
@@ -13,7 +15,31 @@ namespace ClothMesh {
 }
 
 
-glm::vec3 *ptrParticlesPos = new glm::vec3[ClothMesh::numVerts]; // Posiciones de las partículas
+bool playingSimulation;
+
+float resetTime;
+
+const glm::vec3 default_Grav_Accel = glm::vec3(0.0f, -9.81f, 0.0f);
+glm::vec3 vGravAccel = default_Grav_Accel;
+
+glm::vec2 kStrech, kShear, kBend;
+
+float particleLink;
+
+bool useCollisions, useSphereCollider;
+
+float elasticCoef, frictionCoef;
+
+glm::vec3 *ptrParticlesPos0 = new glm::vec3[ClothMesh::numVerts];
+glm::vec3 *ptrParticlesPos = new glm::vec3[ClothMesh::numVerts];
+glm::vec3 *ptrParticlesSpeed = new glm::vec3[ClothMesh::numVerts];
+const float mass = 1.0f;
+glm::vec3 *ptrParticlesForce = new glm::vec3[ClothMesh::numVerts];
+
+
+// Fw Declarations
+void PhysicsInit();
+void PhysicsCleanup();
 
 
 bool show_test_window = false;
@@ -21,14 +47,34 @@ void GUI() {
 	bool show = true;
 	
 	ImGui::Begin("Physics Parameters", &show, 0);
+	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);//FrameRate
 
-	// Do your GUI code here....
-	{	
-		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);//FrameRate
-		
+	ImGui::Checkbox("Play Simulation", &playingSimulation);
+	if (ImGui::Button("Reset Simulation")) {
+		PhysicsInit();
 	}
-	// .........................
+
+	ImGui::DragFloat("Reset time", &resetTime, 1.0f, 0.0f, 10.0f);
+	ImGui::DragFloat3("Gravity Acceleration", &vGravAccel.x, 1.0f);
+
+	if (ImGui::TreeNode("Spring Parameters")) {
+		ImGui::DragFloat2("K Strech", &kStrech.x, 1.0f, 0.0f, 1000.0f);
+		ImGui::DragFloat2("K Shear", &kShear.x, 1.0f, 0.0f, 1000.0f);
+		ImGui::DragFloat2("K Bend", &kBend.x, 1.0f, 0.0f, 1000.0f);
+		ImGui::DragFloat("Particle Link", &particleLink, 1.0f, 0.0f, 10.0f);
+
+		ImGui::TreePop();
+	}
 	
+	if (ImGui::TreeNode("Collisions")) {
+		ImGui::Checkbox("Use Collisions", &useCollisions);
+		ImGui::Checkbox("Use Sphere Collider", &useSphereCollider);
+		ImGui::DragFloat("Elastic Coeficient", &elasticCoef, 1.0f, 0.0f, 1.0f);
+		ImGui::DragFloat("Friction Coeficient", &frictionCoef, 1.0f, 0.0f, 1.0f);
+
+		ImGui::TreePop();
+	}
+
 	ImGui::End();
 
 	// Example code -- ImGui test window. Most of the sample code is in ImGui::ShowTestWindow()
@@ -38,42 +84,93 @@ void GUI() {
 	}
 }
 
-void PhysicsInit() {
-	// Do your initialization code here...
-	// ...................................
-	ClothMesh::setupClothMesh();
+void InitClothMesh() {
 	float posX, posY, posZ;
 	posY = 10.0f;
 
 	posX = 4.0f;
 	int cont = 0;
-	for (int i = 0; i < ClothMesh::numRows; i++)
-	{
+	for (int i = 0; i < ClothMesh::numRows; i++) {
 		posZ = -4.5f;
 		for (int j = 0; j < ClothMesh::numCols; j++)
 		{
-
-			ptrParticlesPos[cont] = { posX,posY,posZ };
+			ptrParticlesPos0[cont] = {posX, posY, posZ};
+			ptrParticlesPos[cont] = { posX, posY, posZ };
 			cont++;
-			posZ += 0.4f;
+			posZ += particleLink;
 		}
 
-		posX -= 0.4f;
+		posX -= particleLink;
+	}
+}
 
+void InitParticles() {
+	for (int i = 0; i < ClothMesh::numVerts; i++) {
+		ptrParticlesPos0[i] = glm::vec3(0.0f, 0.0f, 0.0f);
+		ptrParticlesPos[i] = glm::vec3(0.0f, 0.0f, 0.0f);
+		ptrParticlesSpeed[i] = glm::vec3(0.0f, 0.0f, 0.0f);
+		ptrParticlesForce[i] = mass * vGravAccel;
+	}
+}
+
+void PhysicsInit() {
+	playingSimulation = false;
+
+	resetTime = 5.0f;
+
+	kStrech = kShear = kBend = glm::vec2(1000.0f, 50.0f);
+
+	particleLink = 0.5f;
+
+	useCollisions = useSphereCollider = true;
+
+	elasticCoef = 0.5f;
+	frictionCoef = 0.1f;
+
+	InitParticles();
+
+	InitClothMesh();
+}
+
+void CheckCollisions(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 &v) {
+
+}
+
+void ParticleMovement(int currParticle, float dt) {
+	glm::vec3 _p0 = ptrParticlesPos0[currParticle];
+	glm::vec3 p0 = ptrParticlesPos[currParticle];
+	glm::vec3 v0 = ptrParticlesSpeed[currParticle];
+
+	// Verlet Method
+	glm::vec3 p = p0 + (p0 - _p0) + (ptrParticlesForce[currParticle] / mass) * glm::pow(dt, 2);
+	glm::vec3 v = (p - p0) / dt;
+
+	//CheckCollisions(p0, p, v0, v);
+
+	ptrParticlesPos0[currParticle] = p0;
+	ptrParticlesPos[currParticle] = p;
+	ptrParticlesSpeed[currParticle] = v;
+}
+
+void UpdateParticles(float dt) {
+	for (int i = 0; i < ClothMesh::numVerts; i++) {
+		if (i != 0 && i != ClothMesh::numCols - 1) {
+			ParticleMovement(i, dt);
+		}
 	}
 }
 
 void PhysicsUpdate(float dt) {
-	// Do your update code here...
-	// ...........................
-	
-	
+	if (playingSimulation) {
+		UpdateParticles(dt);
+	}
+
 	ClothMesh::updateClothMesh((float*)ptrParticlesPos);
 }
 
 void PhysicsCleanup() {
-	// Do your cleanup code here...
-	// ............................
-	ClothMesh::cleanupClothMesh();
+	delete[] ptrParticlesPos0;
 	delete[] ptrParticlesPos;
+	delete[] ptrParticlesSpeed;
+	delete[] ptrParticlesForce;
 }
