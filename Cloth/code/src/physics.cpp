@@ -34,7 +34,11 @@ glm::vec3 *ptrParticlesPos0 = new glm::vec3[ClothMesh::numVerts];
 glm::vec3 *ptrParticlesPos = new glm::vec3[ClothMesh::numVerts];
 glm::vec3 *ptrParticlesSpeed = new glm::vec3[ClothMesh::numVerts];
 const float mass = 1.0f;
-glm::vec3 *ptrParticlesForce = new glm::vec3[ClothMesh::numVerts];
+enum class SpringsType {
+	STRETCH, SHEAR, BEND, NUMTYPES
+};
+glm::vec3 **ptrParticlesForce = new glm::vec3*[static_cast<int>(SpringsType::NUMTYPES)];
+
 
 
 // Fw Declarations
@@ -105,11 +109,16 @@ void InitClothMesh() {
 }
 
 void InitParticles() {
+	for (int n = 0; n < static_cast<int>(SpringsType::NUMTYPES); n++)
+	{
+		ptrParticlesForce[n] = new glm::vec3[ClothMesh::numVerts]{mass * vGravAccel};
+	}
 	for (int i = 0; i < ClothMesh::numVerts; i++) {
 		ptrParticlesPos0[i] = glm::vec3(0.0f, 0.0f, 0.0f);
 		ptrParticlesPos[i] = glm::vec3(0.0f, 0.0f, 0.0f);
-		ptrParticlesSpeed[i] = glm::vec3(0.0f, 0.0f, 0.0f);
-		ptrParticlesForce[i] = mass * vGravAccel;
+		ptrParticlesSpeed[i] = vGravAccel;
+	
+		
 	}
 }
 
@@ -118,7 +127,7 @@ void PhysicsInit() {
 
 	resetTime = 5.0f;
 
-	kStrech = kShear = kBend = glm::vec2(1000.0f, 50.0f);
+	kStrech = kShear = kBend = glm::vec2(100.0f, 0.0f);
 
 	particleLink = 0.5f;
 
@@ -132,19 +141,68 @@ void PhysicsInit() {
 	InitClothMesh();
 }
 
+
+void StructuralSpringForce()
+{
+	//Fuerzas en Y
+	
+	glm::vec3 P1;
+	glm::vec3 P2;
+	glm::vec3 v1;
+	glm::vec3 v2;
+	glm::vec3 CurrForce;
+	glm::vec3 SumFuerzas;
+	int TypeForce = static_cast<int>(SpringsType::STRETCH);
+
+	for (int i = 0; i < ClothMesh::numRows; i++)
+	{ 		
+		for (int j = 0; j < ClothMesh::numCols; j++)
+		{
+			 P1 = ptrParticlesPos[i + (ClothMesh::numCols*j)];
+			 P2 = ptrParticlesPos[i + (ClothMesh::numCols*(j+1))];
+			 v1 = ptrParticlesSpeed[i + (ClothMesh::numCols*j)];
+			 v2 = ptrParticlesSpeed[i + (ClothMesh::numCols*(j + 1))];
+			 CurrForce = -(kStrech[0] * (glm::length(P1 - P2) - particleLink) + kStrech[1] * glm::dot((v1 - v2),glm::normalize(P1 -P2)))*glm::normalize(P1 - P2);
+			 if (j != 0 && j != ClothMesh::numCols)
+			 {
+				 ptrParticlesForce[TypeForce][i + ClothMesh::numCols*j] = ptrParticlesForce[TypeForce][i + ClothMesh::numCols*(j - 1)] + CurrForce;
+			 }
+			 else if(j==0)
+			 {
+				 ptrParticlesForce[TypeForce][i + ClothMesh::numCols*j] = CurrForce;
+			 }
+			 else
+			 {
+				 ptrParticlesForce[TypeForce][i + ClothMesh::numCols*j] = -CurrForce;
+			 }
+			 
+		}
+
+	}
+	
+
+}
+
 void CheckCollisions(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 &v) {
 
 }
 
 void ParticleMovement(int currParticle, float dt) {
+
+
 	glm::vec3 _p0 = ptrParticlesPos0[currParticle];
 	glm::vec3 p0 = ptrParticlesPos[currParticle];
 	glm::vec3 v0 = ptrParticlesSpeed[currParticle];
 
+	
 	// Verlet Method
-	glm::vec3 p = p0 + (p0 - _p0) + (ptrParticlesForce[currParticle] / mass) * glm::pow(dt, 2);
+	glm::vec3 f = ptrParticlesForce[static_cast<int>(SpringsType::STRETCH)][currParticle];
+	glm::vec3 p = p0 + (p0 - _p0) + (f / mass) * glm::pow(dt, 2);
 	glm::vec3 v = (p - p0) / dt;
 
+
+	
+	
 	//CheckCollisions(p0, p, v0, v);
 
 	ptrParticlesPos0[currParticle] = p0;
@@ -153,6 +211,7 @@ void ParticleMovement(int currParticle, float dt) {
 }
 
 void UpdateParticles(float dt) {
+	StructuralSpringForce();
 	for (int i = 0; i < ClothMesh::numVerts; i++) {
 		if (i != 0 && i != ClothMesh::numCols - 1) {
 			ParticleMovement(i, dt);
