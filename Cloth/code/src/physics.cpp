@@ -37,7 +37,7 @@ const float mass = 1.0f;
 enum class SpringsType {
 	STRETCH, SHEAR, BEND, NUMTYPES
 };
-glm::vec3 **ptrParticlesForce = new glm::vec3*[static_cast<int>(SpringsType::NUMTYPES)];
+glm::vec3 *ptrParticlesForce = new glm::vec3[ClothMesh::numVerts];
 
 
 
@@ -109,15 +109,11 @@ void InitClothMesh() {
 }
 
 void InitParticles() {
-	for (int n = 0; n < static_cast<int>(SpringsType::NUMTYPES); n++)
-	{
-		ptrParticlesForce[n] = new glm::vec3[ClothMesh::numVerts]{mass * vGravAccel};
-	}
 	for (int i = 0; i < ClothMesh::numVerts; i++) {
 		ptrParticlesPos0[i] = glm::vec3(0.0f, 0.0f, 0.0f);
 		ptrParticlesPos[i] = glm::vec3(0.0f, 0.0f, 0.0f);
 		ptrParticlesSpeed[i] = vGravAccel;
-	
+		ptrParticlesForce[i] = { mass * vGravAccel };
 		
 	}
 }
@@ -127,7 +123,7 @@ void PhysicsInit() {
 
 	resetTime = 5.0f;
 
-	kStrech = kShear = kBend = glm::vec2(100.0f, 0.0f);
+	kStrech = kShear = kBend = glm::vec2(10.0f, 0.0f);
 
 	particleLink = 0.5f;
 
@@ -139,48 +135,6 @@ void PhysicsInit() {
 	InitParticles();
 
 	InitClothMesh();
-}
-
-
-void StructuralSpringForce()
-{
-	//Fuerzas en Y
-	
-	glm::vec3 P1;
-	glm::vec3 P2;
-	glm::vec3 v1;
-	glm::vec3 v2;
-	glm::vec3 CurrForce;
-	glm::vec3 SumFuerzas;
-	int TypeForce = static_cast<int>(SpringsType::STRETCH);
-
-	for (int i = 0; i < ClothMesh::numRows; i++)
-	{ 		
-		for (int j = 0; j < ClothMesh::numCols; j++)
-		{
-			 P1 = ptrParticlesPos[i + (ClothMesh::numCols*j)];
-			 P2 = ptrParticlesPos[i + (ClothMesh::numCols*(j+1))];
-			 v1 = ptrParticlesSpeed[i + (ClothMesh::numCols*j)];
-			 v2 = ptrParticlesSpeed[i + (ClothMesh::numCols*(j + 1))];
-			 CurrForce = -(kStrech[0] * (glm::length(P1 - P2) - particleLink) + kStrech[1] * glm::dot((v1 - v2),glm::normalize(P1 -P2)))*glm::normalize(P1 - P2);
-			 if (j != 0 && j != ClothMesh::numCols)
-			 {
-				 ptrParticlesForce[TypeForce][i + ClothMesh::numCols*j] = ptrParticlesForce[TypeForce][i + ClothMesh::numCols*(j - 1)] + CurrForce;
-			 }
-			 else if(j==0)
-			 {
-				 ptrParticlesForce[TypeForce][i + ClothMesh::numCols*j] = CurrForce;
-			 }
-			 else
-			 {
-				 ptrParticlesForce[TypeForce][i + ClothMesh::numCols*j] = -CurrForce;
-			 }
-			 
-		}
-
-	}
-	
-
 }
 
 void CheckCollisions(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 &v) {
@@ -196,7 +150,7 @@ void ParticleMovement(int currParticle, float dt) {
 
 	
 	// Verlet Method
-	glm::vec3 f = ptrParticlesForce[static_cast<int>(SpringsType::STRETCH)][currParticle];
+	glm::vec3 f = ptrParticlesForce[currParticle];
 	glm::vec3 p = p0 + (p0 - _p0) + (f / mass) * glm::pow(dt, 2);
 	glm::vec3 v = (p - p0) / dt;
 
@@ -210,8 +164,55 @@ void ParticleMovement(int currParticle, float dt) {
 	ptrParticlesSpeed[currParticle] = v;
 }
 
+glm::vec3 CalculateCurrForce(int currPos, int nextPos, glm::vec3 P1, glm::vec3 P2, glm::vec3 v1, glm::vec3 v2) {
+	P1 = ptrParticlesPos[currPos];
+	P2 = ptrParticlesPos[nextPos];
+	v1 = ptrParticlesSpeed[currPos];
+	v2 = ptrParticlesSpeed[nextPos];
+
+	glm::vec3 f = -(kStrech[0] * (glm::length(P1 - P2) - particleLink) + kStrech[1] * glm::dot((v1 - v2), glm::normalize(P1 - P2)))*glm::normalize(P1 - P2);
+
+	return f;
+}
+
+void CalculateStretchForce() {
+	glm::vec3 P1;
+	glm::vec3 P2;
+	glm::vec3 v1;
+	glm::vec3 v2;
+	int currPos, nextPos;
+	glm::vec3 currForce;
+
+	// Vertical
+	for (int i = 0; i < ClothMesh::numRows; i++) {
+		for (int j = 0; j < ClothMesh::numCols; j++) {
+			int currPos = i + (ClothMesh::numCols * j);
+			int nextPos = i + (ClothMesh::numCols* (j + 1));
+
+			currForce = CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2);
+			if (j != 0 && j != ClothMesh::numCols) {
+				ptrParticlesForce[currPos] += -ptrParticlesForce[i + ClothMesh::numCols*(j - 1)] + currForce;
+			}
+			else if (j == 0) {
+				ptrParticlesForce[currPos] += currForce;
+			}
+			else {
+				ptrParticlesForce[currPos] += -ptrParticlesForce[i + ClothMesh::numCols*(j - 1)];
+			}
+
+		}
+
+	}
+}
+
+void CalculateForces()
+{
+	//glm::vec3 SumFuerzas;
+	CalculateStretchForce();
+}
+
 void UpdateParticles(float dt) {
-	StructuralSpringForce();
+	CalculateForces();
 	for (int i = 0; i < ClothMesh::numVerts; i++) {
 		if (i != 0 && i != ClothMesh::numCols - 1) {
 			ParticleMovement(i, dt);
