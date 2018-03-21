@@ -291,7 +291,7 @@ void NewFountainParticles() {
 void NewCascadeParticles() {
 	glm::vec3 x0;
 	if (numParticlesEnabled < MAX_BUFFER_PARTICLES) {
-		x0 = (emitterFinalPos - emitterPos) / glm::vec3(Constants::NUM_PARTICLES_CASCADE);
+		x0 = (emitterFinalPos - emitterPos) / glm::vec3((float)Constants::NUM_PARTICLES_CASCADE);
 		x0 *= (cascadeCurrNumParticles + 1);
 		x0 += emitterPos;
 		cascadeCurrNumParticles = (cascadeCurrNumParticles + 1) % Constants::NUM_PARTICLES_CASCADE;
