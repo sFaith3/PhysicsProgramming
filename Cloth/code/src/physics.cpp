@@ -95,10 +95,10 @@ void InitClothMesh() {
 
 	posX = 4.0f;
 	int cont = 0;
-	for (int i = 0; i < ClothMesh::numRows; i++) {
-		posZ = -4.5f;
-		for (int j = 0; j < ClothMesh::numCols; j++)
+	for (int j = 0; j < ClothMesh::numRows; j++)
 		{
+		posZ = -4.5f;
+		for (int i = 0; i < ClothMesh::numCols; i++) {
 			ptrParticlesPos0[cont] = {posX, posY, posZ};
 			ptrParticlesPos[cont] = { posX, posY, posZ };
 			cont++;
@@ -142,6 +142,7 @@ void CheckCollisions(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 &v) {
 }
 
 void ParticleMovement(int currParticle, float dt) {
+	
 	glm::vec3 _p0 = ptrParticlesPos0[currParticle];
 	glm::vec3 p0 = ptrParticlesPos[currParticle];
 	glm::vec3 v0 = ptrParticlesSpeed[currParticle];
@@ -164,8 +165,9 @@ glm::vec3 CalculateCurrForce(int currPos, int nextPos, glm::vec3 P1, glm::vec3 P
 	v1 = ptrParticlesSpeed[currPos];
 	v2 = ptrParticlesSpeed[nextPos];
 
-	glm::vec3 f = -(kStrech[0] * (glm::length(P1 - P2) - L) + kStrech[1] * glm::dot((v1 - v2), glm::normalize(P1 - P2))) * glm::normalize(P1 - P2);
+	glm::vec3 f = -(kStrech.x * (glm::distance(P1,P2) - L) + kStrech.y * glm::dot((v1 - v2), glm::normalize(P1 - P2))) * glm::normalize(P1-P2);
 
+	
 	return f;
 }
 
@@ -178,26 +180,24 @@ void BendHorizontalForces() {
 	float particleLinkBend = 2.f * particleLink;
 	glm::vec3 currForce;
 
-	for (int i = 0; i < ClothMesh::numCols; i++) {
-		for (int j = 0; j < ClothMesh::numRows; j++) {
-			currPos = (ClothMesh::numCols * i) + j;
+	for (int j = 0; j < ClothMesh::numRows; j++) {
+		for (int i = 0; i < ClothMesh::numCols; i++) {
+			currPos = (ClothMesh::numCols * j) + i;
 
-			currForce = CalculateCurrForce(currPos, currPos + 2, P1, P2, v1, v2, particleLinkBend);
-			if (j == 0) {
+
+			currForce = CalculateCurrForce(currPos, currPos + 2, P1, P2, v1, v2, particleLink);
+			if (i == 0 || i==1) {
 				ptrParticlesForce[currPos] += currForce;
 			}
-			else if (j >= ClothMesh::numRows - 1) {
-				ptrParticlesForce[currPos] += ptrParticlesForce[currPos - 2];
+			else if (i >= ClothMesh::numCols - 2) {
+				ptrParticlesForce[currPos] += -ptrParticlesForce[currPos - 2];
 			}
-			else {
-				ptrParticlesForce[currPos] += ptrParticlesForce[currPos - 2] + currForce;
+			else{
+				ptrParticlesForce[currPos] += -ptrParticlesForce[currPos - 2] + currForce;
 			}
 		}
-		//-----------
-		/*currForce = ptrParticlesForce[currPos];
-		cout << "(" << currForce.x << ", " << currForce.y << ", " << currForce.z << ")" << endl;*/
-		//-----------
 	}
+	
 }
 
 void BendVerticalForces() {
@@ -209,21 +209,23 @@ void BendVerticalForces() {
 	float particleLinkBend = 2.f * particleLink;
 	glm::vec3 currForce;
 
-	for (int i = 0; i < ClothMesh::numCols; i++) {
-		for (int j = 0; j < ClothMesh::numRows; j++) {
-			lastPos = i + (ClothMesh::numRows * (j - 2));
-			currPos = i + (ClothMesh::numRows * j);
-			nextPos = i + (ClothMesh::numRows * (j + 2));
+	for (int j = 0; j < ClothMesh::numCols; j++) {
+		for (int i = 0; i < ClothMesh::numRows; i++) {
 
-			currForce = CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLinkBend);
+			currPos = j + (ClothMesh::numCols * i);
+			nextPos = j + (ClothMesh::numCols * (i + 2));
+			lastPos = j + (ClothMesh::numCols * (i - 2));
+			currForce = CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink);
+
 			if (i == 0) {
+
 				ptrParticlesForce[currPos] += currForce;
 			}
-			else if (i >= ClothMesh::numCols - 1) {
-				ptrParticlesForce[currPos] += ptrParticlesForce[lastPos];
+			else if (i >= ClothMesh::numRows - 2) {
+				ptrParticlesForce[currPos] += -ptrParticlesForce[lastPos];
 			}
 			else {
-				ptrParticlesForce[currPos] += ptrParticlesForce[lastPos] + currForce;
+				ptrParticlesForce[currPos] += -ptrParticlesForce[lastPos] + currForce;
 			}
 		}
 	}
@@ -244,43 +246,45 @@ void CalculateShearForces() {
 	glm::vec3 currForce;
 
 	// Diag sup izq a inf derecha
-	for (int i = 0; i < ClothMesh::numCols; i++) {
-		for (int j = 0; j < ClothMesh::numRows; j++) {
-			currPos = (ClothMesh::numCols * i) + j;
-			lastPos = (currPos - 1) + (i + (ClothMesh::numRows * (j - 1)));
-			nextPos = (currPos + 1) + (i + (ClothMesh::numRows * (j + 1)));
+	for (int j = 0; j < ClothMesh::numRows; j++) {
+		for (int i = 0; i < ClothMesh::numCols; i++) {
+			currPos = (ClothMesh::numCols * j) + i;
+
+			lastPos = i + (ClothMesh::numCols * (j - 1))-1;
+			nextPos = i + (ClothMesh::numCols * (j + 1))+1;
 
 			currForce = CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLinkShear);
-			if ((i == 0 && j == ClothMesh::numRows) || (j == 0 && i == ClothMesh::numCols)) { // No hay F
+			if ((i == 0 && j == ClothMesh::numRows-1) || (j == 0 && i == ClothMesh::numCols-1)) { // No hay F
 			}
 			else if (i == 0 || j == 0) { // Solo hay 1 F
 				ptrParticlesForce[currPos] += currForce;
 			}
-			else if (i == ClothMesh::numCols || j == ClothMesh::numRows) { // 1 F sentido opuesto
-				ptrParticlesForce[currPos] += ptrParticlesForce[lastPos];
+			else if (i == ClothMesh::numCols-1 || j == ClothMesh::numRows-1) { // 1 F sentido opuesto
+				ptrParticlesForce[currPos] += -ptrParticlesForce[lastPos];
 			}
 			else { // 2 Fs. Normal
-				ptrParticlesForce[currPos] += ptrParticlesForce[lastPos] + currForce;
+				ptrParticlesForce[currPos] += -ptrParticlesForce[lastPos] + currForce;
 			}
 		}
 	}
-
+	
 	// Diag inf izq a sup derecha
-	for (int i = 0; i < ClothMesh::numCols; i++) {
-		for (int j = 0; j < ClothMesh::numRows; j++) {
-			currPos = (ClothMesh::numCols * i) + j;
-			lastPos = (currPos - 1) + (i + (ClothMesh::numRows * (j + 1)));
-			nextPos = (currPos + 1) + (i + (ClothMesh::numRows * (j - 1)));
+	for (int j = 0; j < ClothMesh::numRows; j++) {
+		for (int i = 0; i < ClothMesh::numCols; i++) {
+			currPos = (ClothMesh::numCols * j) + i;
+
+			lastPos = i + (ClothMesh::numCols * (j + 1)) - 1;
+			nextPos = i + (ClothMesh::numCols * (j - 1)) + 1;
 
 			currForce = CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLinkShear);
-			if ((i == 0 && j == 0) || (j == ClothMesh::numRows && i == ClothMesh::numCols)) { // No hay F
+			if ((i == 0 && j == 0) || (j == ClothMesh::numRows - 1 && i == ClothMesh::numCols - 1)) { // No hay F
 			}
-			else if (j == 0 || i == ClothMesh::numCols) { // 1 F sentido normal
+			else if (i == 0 || j == ClothMesh::numRows - 1) { // 1 F sentido normal
 				ptrParticlesForce[currPos] += currForce;
 			}
-			else if (i == 0 || j == ClothMesh::numRows) { // 1 F sentido opuesto
+			else if (j == 0 || i == ClothMesh::numCols - 1) { // 1 F sentido opuesto
 				ptrParticlesForce[currPos] += ptrParticlesForce[lastPos];
-			}			
+			}
 			else { // 2 Fs. Normal
 				ptrParticlesForce[currPos] += ptrParticlesForce[lastPos] + currForce;
 			}
@@ -295,20 +299,20 @@ void StretchHorizontalForces() {
 	glm::vec3 v1;
 	glm::vec3 v2;
 	glm::vec3 currForce;
+	for (int j = 0; j < ClothMesh::numRows; j++) {
+		for (int i = 0; i < ClothMesh::numCols; i++) {
+			currPos = (ClothMesh::numCols * j) + i;
 
-	for (int i = 0; i < ClothMesh::numCols; i++) {
-		for (int j = 0; j < ClothMesh::numRows; j++) {
-			currPos = (ClothMesh::numCols * i) + j;
 
 			currForce = CalculateCurrForce(currPos, currPos + 1, P1, P2, v1, v2, particleLink);
-			if (j == 0) {
+			if (i == 0) {
 				ptrParticlesForce[currPos] += currForce;
 			}
-			else if(j == ClothMesh::numRows) {
-				ptrParticlesForce[currPos] += ptrParticlesForce[currPos - 1];
+			else if(i == ClothMesh::numCols-1) {
+				ptrParticlesForce[currPos] += -ptrParticlesForce[currPos - 1];
 			}
 			else {
-				ptrParticlesForce[currPos] += ptrParticlesForce[currPos - 1] + currForce;
+				ptrParticlesForce[currPos] += -ptrParticlesForce[currPos - 1] + currForce;
 			}
 		}
 	}
@@ -321,22 +325,25 @@ void StretchVerticalForces() {
 	glm::vec3 v1;
 	glm::vec3 v2;
 	glm::vec3 currForce;
+	for (int j = 0; j < ClothMesh::numCols-1; j++) {
+		for (int i = 0; i < ClothMesh::numRows-1; i++) {
 
-	for (int i = 0; i < ClothMesh::numCols; i++) {
-		for (int j = 0; j < ClothMesh::numRows; j++) {
-			lastPos = i + (ClothMesh::numRows * (j - 1));
-			currPos = i + (ClothMesh::numRows * j);
-			nextPos = i + (ClothMesh::numRows * (j + 1));
-
+			currPos = j + (ClothMesh::numCols * i);
+			nextPos = j + (ClothMesh::numCols * (i + 1));
+			lastPos = j + (ClothMesh::numCols * (i - 1));
 			currForce = CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink);
+
 			if (i == 0) {
+							
 				ptrParticlesForce[currPos] += currForce;
 			}
-			else if(i == ClothMesh::numCols) {
-				ptrParticlesForce[currPos] += ptrParticlesForce[lastPos];
+			else if(i == ClothMesh::numRows-1) {
+				
+				ptrParticlesForce[currPos] += -ptrParticlesForce[lastPos];
 			}
 			else {
-				ptrParticlesForce[currPos] += ptrParticlesForce[lastPos] + currForce;
+			
+				ptrParticlesForce[currPos] += -ptrParticlesForce[lastPos] + currForce;
 			}
 		}
 	}
@@ -358,7 +365,7 @@ void UpdateParticles(float dt) {
 	CalculateForces();
 
 	for (int i = 0; i < ClothMesh::numVerts; i++) {
-		if (i != 0 && i != ClothMesh::numCols - 1) {
+		if (i != 0 && i != ClothMesh::numCols-1) {
 			ParticleMovement(i, dt);
 		}
 	}
