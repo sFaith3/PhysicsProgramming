@@ -33,12 +33,12 @@ struct Plane {
 
 const int faces_Cube = 6;
 
-const float min_Pos_Sphere = -4.f;
+const float min_Pos_Sphere = 0.f;
 const float max_Pos_Sphere = 4.f;
 
 const float default_Reset_Time = 5.f;
 
-const glm::vec2 default_Ks = glm::vec2(5.0f, 1.0f);
+const glm::vec2 default_Ks = glm::vec2(200.0f, 1.0f);
 
 const float default_Particle_Link = 0.5f;
 
@@ -150,9 +150,9 @@ void InitParticles() {
 }
 
 void InitSphere() {
-	float x = rand() % static_cast<int>(min_Pos_Sphere - max_Pos_Sphere);
-	float y = rand() % static_cast<int>(0.f - max_Pos_Sphere);
-	float z = rand() % static_cast<int>(min_Pos_Sphere - max_Pos_Sphere);
+	float x = rand() % static_cast<int>(min_Pos_Sphere - (max_Pos_Sphere-2));
+	float y = rand() % static_cast<int>((min_Pos_Sphere+1) - (max_Pos_Sphere+3));
+	float z = 0.0f;
 
 	Sphere::posSphere = { x, y, z };
 	Sphere::radiusSphere = 1.0f;
@@ -245,6 +245,8 @@ void CollisionParticlePlane(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 
 	v = v - (frictionCoef * vt);
 }
 
+
+
 void CollisionParticleWithSphere(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 &v) {
 	// Calculamos si la distancia entre la particula y el centro de la esfera - el Radio <=0
 	// Fórmula: d |C-P| = sqrt((pow((Cx - Px),2), pow((Cy - Py),2), pow((Cz - Pz),2))
@@ -260,12 +262,8 @@ void CollisionParticleWithSphere(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::
 		float b = 2 * ((p.x - p0.x) + (p.y - p0.y) + (p.z - p0.z));
 		float c = glm::pow(glm::pow(p.x - p0.x, 2) + glm::pow(p.y - p0.y, 2) + glm::pow(p.z - p0.z, 2), 2);
 
-		alfa1 = -b;
-		alfa1 += glm::sqrt(glm::pow(b, 2) - 4 * a*c);
-		alfa1 /= 2 * a;
-		alfa2 = -b;
-		alfa2 -= glm::sqrt(glm::pow(b, 2) - 4 * a*c);
-		alfa2 /= 2 * a;
+		alfa1 = -b  +  glm::sqrt(glm::pow(b, 2) - (4 * a*c))  /  2 * a;
+		alfa2 = -b - glm::sqrt(glm::pow(b, 2) - (4 * a*c)) / 2 * a;
 
 		(glm::abs(alfa1) > glm::abs(alfa2)) ? resultAlfa = alfa2 : resultAlfa = alfa1;
 
@@ -274,7 +272,6 @@ void CollisionParticleWithSphere(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::
 		glm::vec3 PuntoColision = { p0.x + p0p.x *resultAlfa, p0.y + p0p.y *resultAlfa, p0.z + p0p.z *resultAlfa };
 		glm::vec3 n = glm::normalize(PuntoColision - Sphere::posSphere);
 		float D = -glm::dot(n, PuntoColision);
-
 		CollisionParticlePlane(p0, p, v0, v, n, D);
 	}
 }
@@ -307,6 +304,7 @@ void CheckCollisions(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 &v) {
 }
 
 void ParticleMovement(int currParticle, float dt) {
+	
 	glm::vec3 _p0 = ptrParticlesPos0[currParticle];
 	glm::vec3 p0 = ptrParticlesPos[currParticle];
 	glm::vec3 v0 = ptrParticlesSpeed[currParticle];
@@ -315,15 +313,26 @@ void ParticleMovement(int currParticle, float dt) {
 	glm::vec3 f = ptrParticlesForce[currParticle];
 	glm::vec3 p = p0 + (p0 - _p0) + (f / mass) * glm::pow(dt, 2);
 	glm::vec3 v = (p - p0) / dt;
+		
 	
 	CheckCollisions(p0, p, v0, v);
+	
+	/*glm::vec3 prevP = ptrParticlesPos[currParticle - 1];
+	glm::vec3 v_P1P2 = prevP - p;
+
+	if (glm::length(v_P1P2) > particleLink)
+	{
+		p= prevP + (glm::normalize(v_P1P2) * particleLink);
+	}*/
 
 	ptrParticlesPos0[currParticle] = p0;
 	ptrParticlesPos[currParticle] = p;
 	ptrParticlesSpeed[currParticle] = v;
+	
 }
 
 glm::vec3 CalculateCurrForce(int currPos, int nextPos, glm::vec3 P1, glm::vec3 P2, glm::vec3 v1, glm::vec3 v2, float L, SpringsType currSpringTypeEnum) {
+	
 	P1 = ptrParticlesPos[currPos];
 	P2 = ptrParticlesPos[nextPos];
 	v1 = ptrParticlesSpeed[currPos];
@@ -682,8 +691,9 @@ void ParticlesForces(){
 	for (int i = 0; i < ClothMesh::numCols; i++) {
 		for (int j = 0; j < ClothMesh::numRows; j++) {
 			currPos = i + (ClothMesh::numCols * j);
-			currForce = ptrParticlesForce[currPos];
-
+			
+			currForce = glm::vec3(0.0f, -9.81f, 0.0f);
+			
 			if (i == 0 && (j > 0 && j < ClothMesh::numRows - 1)) {
 				FirstColumnForces(j, currPos, nextPos, currForce, P1, P2, v1, v2);
 			}
@@ -718,10 +728,9 @@ void ParticlesForces(){
 }
 
 void UpdateParticles(float dt) {
-	//const int SIN_NOMBRE = 10;
-	//for (int i = 0; i < SIN_NOMBRE; i++) {
+	
 		ParticlesForces();
-	//}
+	
 
 	for (int i = 0; i < ClothMesh::numVerts; i++) {
 		if (i != 0 && i != ClothMesh::numCols - 1) {
