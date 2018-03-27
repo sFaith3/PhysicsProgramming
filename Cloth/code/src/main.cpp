@@ -79,11 +79,12 @@ int main(int argc, char** argv) {
 	// Disable V-Sync
 	SDL_GL_SetSwapInterval(0);
 
+	// Init scene
 	int display_w, display_h;
 	SDL_GL_GetDrawableSize(mainwindow, &display_w, &display_h);
-	// Init scene
 	GLinit(display_w, display_h);
 	PhysicsInit();
+
 	// Setup ImGui binding
 	ImGui_ImplSdlGL3_Init(mainwindow);
 
@@ -122,10 +123,11 @@ int main(int argc, char** argv) {
 		waitforFrameEnd();
 	}
 
+	ImGui_ImplSdlGL3_Shutdown();
+
 	PhysicsCleanup();
 	GLcleanup();
 
-	ImGui_ImplSdlGL3_Shutdown();
 	SDL_GL_DeleteContext(maincontext);
 	SDL_DestroyWindow(mainwindow);
 	SDL_Quit();

@@ -23,10 +23,6 @@ namespace Capsule {
 	extern void updateCapsule(glm::vec3 posA, glm::vec3 posB, float radius);
 }
 
-namespace Box {
-	extern float cubeVerts[];
-}
-
 enum class EnumTypeMovement {
 	FOUNTAIN, CASCADE
 };

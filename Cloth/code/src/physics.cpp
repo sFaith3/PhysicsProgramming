@@ -1,6 +1,7 @@
 #include <imgui\imgui.h>
 #include <imgui\imgui_impl_sdl_gl3.h>
 #include <glm/glm.hpp>
+#include <vector>
 #include <iostream>
 using namespace std;
 
@@ -14,33 +15,64 @@ namespace ClothMesh {
 	 extern const int numVerts;
 }
 
+namespace Sphere {
+	extern glm::vec3 posSphere;
+	extern float radiusSphere;
+	extern void updateSphere(glm::vec3 pos, float radius);
+}
 
 enum class SpringsType {
-	STRETCH, SHEAR, BEND, NUMTYPES
+	STRETCH, SHEAR, BEND
 };
-SpringsType sTypes;
+
+struct Plane {
+	glm::vec3 normal;
+	float D;
+};
+
+
+const int faces_Cube = 6;
+
+const float min_Pos_Sphere = -4.f;
+const float max_Pos_Sphere = 4.f;
+
+const float default_Reset_Time = 5.f;
+
+const glm::vec2 default_Ks = glm::vec2(5.0f, 1.0f);
+
+const float default_Particle_Link = 0.5f;
+
+const float default_Elastic_Coef = 0.5f;
+const float default_Friction_Coef = 0.1f;
+
+const glm::vec3 default_Grav_Accel = glm::vec3(0.0f, -9.81f, 0.0f);
+const float mass = 1.0f;
+
 
 bool playingSimulation;
 
 float resetTime;
 
-const glm::vec3 default_Grav_Accel = glm::vec3(0.0f, -9.81f, 0.0f);
 glm::vec3 vGravAccel = default_Grav_Accel;
 
 glm::vec2 kStrech, kShear, kBend;
 
-float particleLink;
+float particleLink, lastParticleLink;
 
-bool useCollisions, useSphereCollider;
+bool useCollisions;
 
 float elasticCoef, frictionCoef;
+
+vector<Plane> planes;
 
 glm::vec3 *ptrParticlesPos0 = new glm::vec3[ClothMesh::numVerts];
 glm::vec3 *ptrParticlesPos = new glm::vec3[ClothMesh::numVerts];
 glm::vec3 *ptrParticlesSpeed = new glm::vec3[ClothMesh::numVerts];
-const float mass = 1.0f;
 glm::vec3 *ptrParticlesForce = new glm::vec3[ClothMesh::numVerts];
 
+extern bool renderSphere;
+
+float currTime;
 
 // Fw Declarations
 void PhysicsInit();
@@ -73,7 +105,7 @@ void GUI() {
 	
 	if (ImGui::TreeNode("Collisions")) {
 		ImGui::Checkbox("Use Collisions", &useCollisions);
-		ImGui::Checkbox("Use Sphere Collider", &useSphereCollider);
+		ImGui::Checkbox("Use Sphere Collider", &renderSphere);
 		ImGui::DragFloat("Elastic Coeficient", &elasticCoef, 1.0f, 0.0f, 1.0f);
 		ImGui::DragFloat("Friction Coeficient", &frictionCoef, 1.0f, 0.0f, 1.0f);
 
@@ -117,27 +149,161 @@ void InitParticles() {
 	}
 }
 
+void InitSphere() {
+	float x = rand() % static_cast<int>(min_Pos_Sphere - max_Pos_Sphere);
+	float y = rand() % static_cast<int>(0.f - max_Pos_Sphere);
+	float z = rand() % static_cast<int>(min_Pos_Sphere - max_Pos_Sphere);
+
+	Sphere::posSphere = { x, y, z };
+	Sphere::radiusSphere = 1.0f;
+}
+
+void InitColliders() {
+	useCollisions = false;
+
+	// Sphere
+	renderSphere = false;
+	InitSphere();
+}
+
+/*
+* D = -(Ax + By + Cz)
+*/
+void InitPlanes() {
+	Plane newPlane;
+
+	// Plane 1
+	newPlane.normal = glm::vec3(0.f, -1.f, 0.f);
+	newPlane.D = -glm::dot(newPlane.normal, glm::vec3(5.0f, 10.0f, 5.0f));
+	planes.push_back(newPlane);
+
+	// Plane 2
+	newPlane.normal = glm::vec3(0.f, 1.f, 0.f);
+	newPlane.D = -glm::dot(newPlane.normal, glm::vec3(-5.0f, 0.0f, -5.0f));
+	planes.push_back(newPlane);
+
+	// Plane 3
+	newPlane.normal = glm::vec3(-1.f, 0.f, 0.f);
+	newPlane.D = -glm::dot(newPlane.normal, glm::vec3(5.0f, 0.0f, 5.0f));
+	planes.push_back(newPlane);
+
+	// Plane 4
+	newPlane.normal = glm::vec3(1.f, 0.f, 0.f);
+	newPlane.D = -glm::dot(newPlane.normal, glm::vec3(-5.0f, 0.0f, -5.0f));
+	planes.push_back(newPlane);
+
+	// Plane 5
+	newPlane.normal = glm::vec3(0.f, 0.f, -1.f);
+	newPlane.D = -glm::dot(newPlane.normal, glm::vec3(-5.0f, 0.0f, 5.0f));
+	planes.push_back(newPlane);
+
+	// Plane 6
+	newPlane.normal = glm::vec3(0.f, 0.f, 1.f);
+	newPlane.D = -glm::dot(newPlane.normal, glm::vec3(5.0f, 0.0f, -5.0f));
+	planes.push_back(newPlane);
+}
+
 void PhysicsInit() {
 	playingSimulation = false;
 
-	resetTime = 5.0f;
+	resetTime = default_Reset_Time;
 
-	kStrech = kShear = kBend = glm::vec2(10.0f, 0.0f);
+	kStrech = kShear = kBend = default_Ks;
 
-	particleLink = 0.5f;
+	particleLink = lastParticleLink = default_Particle_Link;
 
-	useCollisions = useSphereCollider = true;
+	elasticCoef = default_Elastic_Coef;
+	frictionCoef = default_Friction_Coef;
 
-	elasticCoef = 0.5f;
-	frictionCoef = 0.1f;
+	currTime = 0.f;
 
+	InitColliders();
+	InitPlanes();
 	InitParticles();
-
 	InitClothMesh();
 }
 
-void CheckCollisions(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 &v) {
+void PhysicsReinit() {
+	currTime = 0.f;
 
+	InitSphere();
+	InitParticles();
+	InitClothMesh();
+}
+
+void CollisionParticlePlane(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 &v, glm::vec3 n, float d) {
+	p0 = p;
+	v0 = v;
+
+	// With Elasticity
+	p = p0 - (1 + elasticCoef) * (glm::dot(n, p0) + d) * n;
+	v = v0 - (1 + elasticCoef) * glm::dot(n, v0) * n;
+
+	// With Friction
+	glm::vec3 vn = glm::dot(n, v) * n;
+	glm::vec3 vt = v - vn;
+	v = v - (frictionCoef * vt);
+}
+
+void CollisionParticleWithSphere(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 &v) {
+	// Calculamos si la distancia entre la particula y el centro de la esfera - el Radio <=0
+	// Fórmula: d |C-P| = sqrt((pow((Cx - Px),2), pow((Cy - Py),2), pow((Cz - Pz),2))
+	float d = glm::sqrt(glm::pow(Sphere::posSphere.x - p.x, 2) + glm::pow(Sphere::posSphere.y - p.y, 2) + glm::pow(Sphere::posSphere.z - p.z, 2));
+	if (d < Sphere::radiusSphere) {
+		glm::vec3 p0p = p - p0;
+		float alfa1 = 0, alfa2 = 0, resultAlfa = 0;
+
+		// Usaremos la equación de la recta y la equacion de la esfera.
+		// Sacaremos una equiacion Ax^2 + bx + c = 0 para descubrir la alfa
+		float a = glm::pow(p0.x - Sphere::posSphere.x, 2) + glm::pow(p0.y - Sphere::posSphere.y, 2) + glm::pow(p0.z - Sphere::posSphere.z, 2) - glm::pow(Sphere::radiusSphere, 2) +
+			2 * ((p0.x - Sphere::posSphere.x) + (p0.y - Sphere::posSphere.y) + (p0.z - Sphere::posSphere.z));
+		float b = 2 * ((p.x - p0.x) + (p.y - p0.y) + (p.z - p0.z));
+		float c = glm::pow(glm::pow(p.x - p0.x, 2) + glm::pow(p.y - p0.y, 2) + glm::pow(p.z - p0.z, 2), 2);
+
+		alfa1 = -b;
+		alfa1 += glm::sqrt(glm::pow(b, 2) - 4 * a*c);
+		alfa1 /= 2 * a;
+		alfa2 = -b;
+		alfa2 -= glm::sqrt(glm::pow(b, 2) - 4 * a*c);
+		alfa2 /= 2 * a;
+
+		(glm::abs(alfa1) > glm::abs(alfa2)) ? resultAlfa = alfa2 : resultAlfa = alfa1;
+
+		// recta: r = p0 + &p0p; buscaremos el valor "&".
+		// Una vez tengamos alfa conoceremos el punto de colision.
+		glm::vec3 PuntoColision = { p0.x + p0p.x *resultAlfa, p0.y + p0p.y *resultAlfa, p0.z + p0p.z *resultAlfa };
+		glm::vec3 n = glm::normalize(PuntoColision - Sphere::posSphere);
+		float D = -glm::dot(n, PuntoColision);
+
+		CollisionParticlePlane(p0, p, v0, v, n, D);
+	}
+}
+
+void CollisionParticleWithWallsAndGround(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 &v) {
+	Plane currPlane;
+	glm::vec3 n;
+	float d;
+
+	for (int i = 0; i < faces_Cube; i++) {
+		currPlane = planes[i];
+		n = currPlane.normal;
+
+		d = (glm::dot(n, p) + currPlane.D) * (glm::dot(n, p0) + currPlane.D);
+		if (d < 0.0f) {
+			CollisionParticlePlane(p0, p, v0, v, n, currPlane.D);
+			break;
+		}
+	}
+}
+
+void CheckCollisions(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 &v) {
+	if (useCollisions) {
+		CollisionParticleWithWallsAndGround(p0, p, v0, v);
+	}
+
+	if (renderSphere) {
+		CollisionParticleWithSphere(p0, p, v0, v);
+	}
 }
 
 void ParticleMovement(int currParticle, float dt) {
@@ -150,37 +316,35 @@ void ParticleMovement(int currParticle, float dt) {
 	glm::vec3 p = p0 + (p0 - _p0) + (f / mass) * glm::pow(dt, 2);
 	glm::vec3 v = (p - p0) / dt;
 	
-	//CheckCollisions(p0, p, v0, v);
+	CheckCollisions(p0, p, v0, v);
 
 	ptrParticlesPos0[currParticle] = p0;
 	ptrParticlesPos[currParticle] = p;
 	ptrParticlesSpeed[currParticle] = v;
 }
 
-glm::vec3 CalculateCurrForce(int currPos, int nextPos, glm::vec3 P1, glm::vec3 P2, glm::vec3 v1, glm::vec3 v2, float _L, SpringsType sTypes) {
+glm::vec3 CalculateCurrForce(int currPos, int nextPos, glm::vec3 P1, glm::vec3 P2, glm::vec3 v1, glm::vec3 v2, float L, SpringsType currSpringTypeEnum) {
 	P1 = ptrParticlesPos[currPos];
 	P2 = ptrParticlesPos[nextPos];
 	v1 = ptrParticlesSpeed[currPos];
 	v2 = ptrParticlesSpeed[nextPos];
 	glm::vec3 f;
-	float L = _L;
-	switch (sTypes)
-	{
+
+	switch (currSpringTypeEnum) {
 	case SpringsType::STRETCH:
-		L = _L;
 		f = -(kStrech.x * (glm::distance(P1, P2) - L) + kStrech.y * glm::dot((v1 - v2), glm::normalize(P1 - P2))) * glm::normalize(P1 - P2);
+		break;
 
-			break;
 	case SpringsType::SHEAR:
-		L = glm::sqrt(glm::pow(_L, 2) + glm::pow(_L, 2));
+		L = glm::sqrt(glm::pow(L, 2) + glm::pow(L, 2));
 		f = -(kShear.x * (glm::distance(P1, P2) - L) + kShear.y * glm::dot((v1 - v2), glm::normalize(P1 - P2))) * glm::normalize(P1 - P2);
-
 		break;
+
 	case SpringsType::BEND:
-		L = 2 * _L;
-		 f = -(kBend.x * (glm::distance(P1, P2) - L) + kBend.y * glm::dot((v1 - v2), glm::normalize(P1 - P2))) * glm::normalize(P1 - P2);
-
+		L *= 2.f;
+		f = -(kBend.x * (glm::distance(P1, P2) - L) + kBend.y * glm::dot((v1 - v2), glm::normalize(P1 - P2))) * glm::normalize(P1 - P2);
 		break;
+
 	default:
 		break;
 	}
@@ -188,8 +352,329 @@ glm::vec3 CalculateCurrForce(int currPos, int nextPos, glm::vec3 P1, glm::vec3 P
 	return f;
 }
 
+void RemainingForces(int i, int j, int currPos, int nextPos, glm::vec3 &currForce, glm::vec3 P1, glm::vec3 P2, glm::vec3 v1, glm::vec3 v2) {
+	/// Stretch
+	// Vertical
+	nextPos = currPos + ClothMesh::numCols;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
+
+	nextPos = currPos - ClothMesh::numCols;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
+
+	// Horizontal
+	nextPos = currPos + 1;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
+
+	nextPos = currPos - 1;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
+
+	/// Shear
+	nextPos = (currPos - 1) + ClothMesh::numCols;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
+
+	nextPos = (currPos - 1) - ClothMesh::numCols;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
+
+	nextPos = (currPos + 1) - ClothMesh::numCols;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
+
+	nextPos = (currPos + 1) + ClothMesh::numCols;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
+
+	/// Bend
+	// Vertical
+	if (j < (ClothMesh::numRows - 1) - 1) {
+		nextPos = currPos + (ClothMesh::numCols * 2);
+		currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+
+		if (j >= 2) {
+			nextPos = currPos - (ClothMesh::numCols * 2);
+			currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+		}
+	}
+	else {
+		nextPos = currPos - (ClothMesh::numCols * 2);
+		currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+	}
+
+	// Horizontal
+	if (i < (ClothMesh::numCols - 1) - 1) {
+		nextPos = currPos + 2;
+		currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+
+		if (i >= 2) {
+			nextPos = currPos - 2;
+			currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+		}
+	}
+	else {
+		nextPos = currPos - 2;
+		currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+	}
+}
+
+void LowerRightCornerForces(int currPos, int nextPos, glm::vec3 &currForce, glm::vec3 P1, glm::vec3 P2, glm::vec3 v1, glm::vec3 v2) {
+	/// Stretch
+	// Vertical
+	nextPos = currPos - ClothMesh::numCols;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
+
+	// Horizontal
+	nextPos = currPos - 1;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
+
+	/// Shear
+	nextPos = (currPos - 1) - ClothMesh::numCols;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
+
+	/// Bend
+	// Vertical
+	nextPos = currPos - (ClothMesh::numCols * 2);
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+
+	// Horizontal
+	nextPos = currPos - 2;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+}
+
+void LowerLeftCornerForces(int currPos, int nextPos, glm::vec3 &currForce, glm::vec3 P1, glm::vec3 P2, glm::vec3 v1, glm::vec3 v2) {
+	/// Stretch
+	// Vertical
+	nextPos = currPos - ClothMesh::numCols;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
+
+	// Horizontal
+	nextPos = currPos + 1;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
+
+	/// Shear
+	nextPos = (currPos + 1) - ClothMesh::numCols;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
+
+	/// Bend
+	// Vertical
+	nextPos = currPos - (ClothMesh::numCols * 2);
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+
+	// Horizontal
+	nextPos = currPos + 2;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+}
+
+void UpperRightCornerForces(int currPos, int nextPos, glm::vec3 &currForce, glm::vec3 P1, glm::vec3 P2, glm::vec3 v1, glm::vec3 v2) {
+	/// Stretch
+	// Vertical
+	nextPos = currPos + ClothMesh::numCols;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
+
+	// Horizontal
+	nextPos = currPos - 1;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
+
+	/// Shear
+	nextPos = (currPos - 1) + ClothMesh::numCols;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
+
+	/// Bend
+	// Vertical
+	nextPos = currPos + (ClothMesh::numCols * 2);
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+
+	// Horizontal
+	nextPos = currPos - 2;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+}
+
+void UpperLeftCornerForces(int currPos, int nextPos, glm::vec3 &currForce, glm::vec3 P1, glm::vec3 P2, glm::vec3 v1, glm::vec3 v2) {
+	/// Stretch
+	// Vertical
+	nextPos = currPos + ClothMesh::numCols;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
+
+	// Horizontal
+	nextPos = currPos + 1;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
+
+	/// Shear
+	nextPos = (currPos + 1) + ClothMesh::numCols;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
+
+	/// Bend
+	// Vertical
+	nextPos = currPos + (ClothMesh::numCols * 2);
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+
+	// Horizontal
+	nextPos = currPos + 2;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+}
+
+void LastRowForces(int i, int currPos, int nextPos, glm::vec3 &currForce, glm::vec3 P1, glm::vec3 P2, glm::vec3 v1, glm::vec3 v2) {
+	/// Structural
+	// Vertical
+	nextPos = currPos - ClothMesh::numCols;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
+
+	// Horizontal
+	nextPos = currPos + 1;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
+
+	nextPos = currPos - 1;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
+
+	/// Shear
+	nextPos = (currPos - 1) - ClothMesh::numCols;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
+
+	nextPos = (currPos + 1) - ClothMesh::numCols;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
+
+	/// Bend
+	// Vertical
+	nextPos = currPos - (ClothMesh::numCols * 2);
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+
+	// Horizontal
+	if (i < (ClothMesh::numCols - 1) - 1) {
+		nextPos = currPos + 2;
+		currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+
+		if (i >= 2) {
+			nextPos = currPos - 2;
+			currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+		}
+	}
+	else {
+		nextPos = currPos - 2;
+		currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+	}
+}
+
+void FirstRowForces(int i, int currPos, int nextPos, glm::vec3 &currForce, glm::vec3 P1, glm::vec3 P2, glm::vec3 v1, glm::vec3 v2) {
+	/// Stretch
+	// Vertical
+	nextPos = currPos + ClothMesh::numCols;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
+
+	// Horizontal
+	nextPos = currPos + 1;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
+
+	nextPos = currPos - 1;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
+
+	/// Shear
+	nextPos = (currPos - 1) + ClothMesh::numCols;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
+
+	nextPos = (currPos + 1) + ClothMesh::numCols;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
+
+	/// Bend
+	// Vertical
+	nextPos = currPos + (ClothMesh::numCols * 2);
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+
+	// Horizontal
+	if (i < (ClothMesh::numCols - 1) - 1) {
+		nextPos = currPos + 2;
+		currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+
+		if (i >= 2) {
+			nextPos = currPos - 2;
+			currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+		}
+	}
+	else {
+		nextPos = currPos - 2;
+		currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+	}
+}
+
+void LastColumnForces(int j, int currPos, int nextPos, glm::vec3 &currForce, glm::vec3 P1, glm::vec3 P2, glm::vec3 v1, glm::vec3 v2) {
+	/// Stretch
+	// Vertical
+	nextPos = currPos + ClothMesh::numCols;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
+
+	nextPos = currPos - ClothMesh::numCols;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
+
+	// Horizontal
+	nextPos = currPos - 1;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
+
+	/// Shear
+	nextPos = (currPos - 1) + ClothMesh::numCols;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
+
+	nextPos = (currPos - 1) - ClothMesh::numCols;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
+
+	/// Bend
+	// Vertical
+	if (j < (ClothMesh::numRows - 1) - 1) {
+		nextPos = currPos + (ClothMesh::numCols * 2);
+		currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+
+		if (j >= 2) {
+			nextPos = currPos - (ClothMesh::numCols * 2);
+			currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+		}
+	}
+	else {
+		nextPos = currPos - (ClothMesh::numCols * 2);
+		currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+	}
+
+	// Horizontal
+	nextPos = currPos - 2;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+}
+
+void FirstColumnForces(int j, int currPos, int nextPos, glm::vec3 &currForce, glm::vec3 P1, glm::vec3 P2, glm::vec3 v1, glm::vec3 v2) {
+	/// Stretch
+	// Vertical
+	nextPos = currPos + ClothMesh::numCols;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
+
+	nextPos = currPos - ClothMesh::numCols;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
+
+	// Horizontal
+	nextPos = currPos + 1;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
+
+	/// Shear
+	nextPos = (currPos + 1) + ClothMesh::numCols;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
+
+	nextPos = (currPos + 1) - ClothMesh::numCols;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
+
+	/// Bend
+	// Vertical
+	if (j < (ClothMesh::numRows - 1) - 1) {
+		nextPos = currPos + (ClothMesh::numCols * 2);
+		currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+
+		if (j >= 2) {
+			nextPos = currPos - (ClothMesh::numCols * 2);
+			currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+		}
+	}
+	else {
+		nextPos = currPos - (ClothMesh::numCols * 2);
+		currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+	}
+
+	// Horizontal
+	nextPos = currPos + 2;
+	currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+}
+
 void ParticlesForces(){
-	int currPos, nextPos;
+	int currPos, nextPos = 0;
 	glm::vec3 P1, P2;
 	glm::vec3 v1, v2;
 	glm::vec3 currForce;
@@ -199,344 +684,44 @@ void ParticlesForces(){
 			currPos = i + (ClothMesh::numCols * j);
 			currForce = ptrParticlesForce[currPos];
 
-			/// First Col
 			if (i == 0 && (j > 0 && j < ClothMesh::numRows - 1)) {
-				/// Stretch
-				// Vertical
-				nextPos = currPos + ClothMesh::numCols;
-				currForce += CalculateCurrForce(currPos, nextPos , P1, P2, v1, v2, particleLink,SpringsType::STRETCH);
-
-				nextPos = currPos - ClothMesh::numCols;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
-
-				// Horizontal
-				nextPos = currPos + 1;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
-
-				/// Shear
-				nextPos = (currPos + 1) + ClothMesh::numCols ;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
-
-				nextPos = (currPos + 1) - ClothMesh::numCols ;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink,SpringsType::SHEAR);
-
-				/// Bend
-				// Vertical
-				if (j < (ClothMesh::numRows - 1) - 1) {
-					nextPos = currPos + (ClothMesh::numCols * 2);
-					currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
-
-					if (j >= 2) {
-						nextPos = currPos - (ClothMesh::numCols * 2);
-						currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
-					}
-				}
-				else {
-					nextPos = currPos - (ClothMesh::numCols * 2);
-					currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
-				}
-
-				// Horizontal
-				nextPos = currPos + 2;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+				FirstColumnForces(j, currPos, nextPos, currForce, P1, P2, v1, v2);
 			}
-
-			/// Last Col
 			else if (i == ClothMesh::numCols - 1 && (j > 0 && j < ClothMesh::numRows - 1)) {
-				/// Stretch
-				// Vertical
-				nextPos = currPos + ClothMesh::numCols;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
-
-				nextPos = currPos - ClothMesh::numCols;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
-
-				// Horizontal
-				nextPos = currPos - 1;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
-
-				/// Shear
-				nextPos = (currPos - 1) + ClothMesh::numCols;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
-
-				nextPos = (currPos - 1) - ClothMesh::numCols;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
-
-				/// Bend
-				// Vertical
-				if (j < (ClothMesh::numRows - 1) - 1) {
-					nextPos = currPos + (ClothMesh::numCols * 2);
-					currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
-
-					if (j >= 2) {
-						nextPos = currPos - (ClothMesh::numCols * 2);
-						currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
-					}
-				}
-				else {
-					nextPos = currPos - (ClothMesh::numCols * 2);
-					currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
-				}
-
-				// Horizontal
-				nextPos = currPos - 2;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+				LastColumnForces(j, currPos, nextPos, currForce, P1, P2, v1, v2);
 			}
-
-			/// First row
 			else if ((i > 0 && i < ClothMesh::numCols - 1) && j == 0) {
-				/// Stretch
-				// Vertical
-				nextPos = currPos + ClothMesh::numCols;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
-
-				// Horizontal
-				nextPos = currPos + 1;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
-
-				nextPos = currPos - 1;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
-
-				/// Shear
-				nextPos = (currPos - 1) + ClothMesh::numCols ;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
-
-				nextPos = (currPos + 1) + ClothMesh::numCols ;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
-
-				/// Bend
-				// Vertical
-				nextPos = currPos + (ClothMesh::numCols * 2);
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
-
-				// Horizontal
-				if (i < (ClothMesh::numCols - 1) - 1) {
-					nextPos = currPos + 2;
-					currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
-
-					if (i >= 2) {
-						nextPos = currPos - 2;
-						currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
-					}
-				}
-				else {
-					nextPos = currPos - 2;
-					currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
-				}
+				FirstRowForces(i, currPos, nextPos, currForce, P1, P2, v1, v2);
 			}
-
-			/// Last row
 			else if ((i > 0 && i < ClothMesh::numCols - 1) && j == ClothMesh::numRows - 1) {
-				/// Structural
-				// Vertical
-				nextPos = currPos - ClothMesh::numCols;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
-
-				// Horizontal
-				nextPos = currPos + 1;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
-
-				nextPos = currPos - 1;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
-
-				/// Shear
-				nextPos = (currPos - 1) - ClothMesh::numCols ;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
-
-				nextPos = (currPos + 1) - ClothMesh::numCols ;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
-
-				/// Bend
-				// Vertical
-				nextPos = currPos - (ClothMesh::numCols * 2);
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
-
-				// Horizontal
-				if (i < (ClothMesh::numCols - 1) - 1) {
-					nextPos = currPos + 2;
-					currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
-
-					if (i >= 2) {
-						nextPos = currPos - 2;
-						currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
-					}
-				}
-				else {
-					nextPos = currPos - 2;
-					currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
-				}
+				LastRowForces(i, currPos, nextPos, currForce, P1, P2, v1, v2);
 			}
-
-			/// Esquina superior izquierda
 			else if (i == 0 && j == 0) {
-				/// Stretch
-				// Vertical
-				nextPos = currPos + ClothMesh::numCols;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
-
-				// Horizontal
-				nextPos = currPos + 1;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
-
-				/// Shear
-				nextPos = (currPos + 1) + ClothMesh::numCols ;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
-
-				/// Bend
-				// Vertical
-				nextPos = currPos + (ClothMesh::numCols * 2);
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
-
-				// Horizontal
-				nextPos = currPos + 2;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+				UpperLeftCornerForces(currPos, nextPos, currForce, P1, P2, v1, v2);
 			}
-
-			/// Esquina superior derecha
 			else if (i == ClothMesh::numCols - 1 && j == 0) {
-				/// Stretch
-				// Vertical
-				nextPos = currPos + ClothMesh::numCols;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
-
-				// Horizontal
-				nextPos = currPos - 1;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
-
-				/// Shear
-				nextPos = (currPos - 1) + ClothMesh::numCols ;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
-
-				/// Bend
-				// Vertical
-				nextPos = currPos + (ClothMesh::numCols * 2);
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
-
-				// Horizontal
-				nextPos = currPos - 2;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+				UpperRightCornerForces(currPos, nextPos, currForce, P1, P2, v1, v2);
 			}
-
-			/// Esquina inferior izquierda
 			else if (i == 0 && j == ClothMesh::numRows - 1) {
-				/// Stretch
-				// Vertical
-				nextPos = currPos - ClothMesh::numCols;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
-
-				// Horizontal
-				nextPos = currPos + 1;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
-
-				/// Shear
-				nextPos = (currPos + 1) - ClothMesh::numCols ;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
-
-				/// Bend
-				// Vertical
-				nextPos = currPos - (ClothMesh::numCols * 2);
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
-
-				// Horizontal
-				nextPos = currPos + 2;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+				LowerLeftCornerForces(currPos, nextPos, currForce, P1, P2, v1, v2);
 			}
-
-			/// Esquina inferior derecha
 			else if (i == ClothMesh::numCols - 1 && j == ClothMesh::numRows - 1) {
-				/// Stretch
-				// Vertical
-				nextPos = currPos - ClothMesh::numCols;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
-
-				// Horizontal
-				nextPos = currPos - 1;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
-
-				/// Shear
-				nextPos = (currPos - 1) - ClothMesh::numCols ;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
-
-				/// Bend
-				// Vertical
-				nextPos = currPos - (ClothMesh::numCols * 2);
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
-
-				// Horizontal
-				nextPos = currPos - 2;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
+				LowerRightCornerForces(currPos, nextPos, currForce, P1, P2, v1, v2);
 			}
-
-			/// Lo demás
 			else if((i > 0 && j > 0) && (i < ClothMesh::numCols - 1 && j < ClothMesh::numRows - 1)){
-				/// Stretch
-				// Vertical
-				nextPos = currPos + ClothMesh::numCols;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
-
-				nextPos = currPos - ClothMesh::numCols;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
-
-				// Horizontal
-				nextPos = currPos + 1;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
-
-				nextPos = currPos - 1;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::STRETCH);
-
-				/// Shear
-				nextPos = (currPos - 1) + ClothMesh::numCols ;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
-
-				nextPos = (currPos - 1) - ClothMesh::numCols ;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
-
-				nextPos = (currPos + 1) - ClothMesh::numCols ;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
-
-				nextPos = (currPos + 1) + ClothMesh::numCols ;
-				currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::SHEAR);
-
-				/// Bend
-				// Vertical
-				if (j < (ClothMesh::numRows - 1) - 1) {
-					nextPos = currPos + (ClothMesh::numCols * 2);
-					currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
-
-					if (j >= 2) {
-						nextPos = currPos - (ClothMesh::numCols * 2);
-						currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
-					}
-				}
-				else {
-					nextPos = currPos - (ClothMesh::numCols * 2);
-					currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
-				}
-
-				// Horizontal
-				if (i < (ClothMesh::numCols - 1) - 1) {
-					nextPos = currPos + 2;
-					currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
-
-					if (i >= 2) {
-						nextPos = currPos - 2;
-						currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
-					}
-				}
-				else {
-					nextPos = currPos - 2;
-					currForce += CalculateCurrForce(currPos, nextPos, P1, P2, v1, v2, particleLink, SpringsType::BEND);
-				}
-
+				RemainingForces(i, j, currPos, nextPos, currForce, P1, P2, v1, v2);
 			}
 
-			ptrParticlesForce[currPos] += currForce;
+			ptrParticlesForce[currPos] = currForce;
 		}
 	}
 }
 
 void UpdateParticles(float dt) {
-	ParticlesForces();
+	//const int SIN_NOMBRE = 10;
+	//for (int i = 0; i < SIN_NOMBRE; i++) {
+		ParticlesForces();
+	//}
 
 	for (int i = 0; i < ClothMesh::numVerts; i++) {
 		if (i != 0 && i != ClothMesh::numCols - 1) {
@@ -547,10 +732,23 @@ void UpdateParticles(float dt) {
 
 void PhysicsUpdate(float dt) {
 	if (playingSimulation) {
+		currTime += dt;
+		if (currTime >= resetTime) {
+			PhysicsReinit();
+		}
+		
 		UpdateParticles(dt);
+	}
+	else if (lastParticleLink != particleLink) {
+		lastParticleLink = particleLink;
+		InitClothMesh();
 	}
 
 	ClothMesh::updateClothMesh((float*)ptrParticlesPos);
+
+	if (renderSphere) {
+		Sphere::updateSphere(Sphere::posSphere, Sphere::radiusSphere);
+	}
 }
 
 void PhysicsCleanup() {
