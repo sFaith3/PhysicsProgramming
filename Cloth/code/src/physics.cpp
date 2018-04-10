@@ -1,6 +1,7 @@
 #include <imgui\imgui.h>
 #include <imgui\imgui_impl_sdl_gl3.h>
 #include <glm/glm.hpp>
+#include <glm\gtx\intersect.hpp>
 #include <vector>
 #include <iostream>
 using namespace std;
@@ -38,7 +39,7 @@ const float max_Pos_Sphere = 4.f;
 
 const float default_Reset_Time = 5.f;
 
-const glm::vec2 default_Ks = glm::vec2(200.0f, 1.0f);
+const glm::vec2 default_Ks = glm::vec2(1000.0f,50.0f);
 
 const float default_Particle_Link = 0.5f;
 
@@ -257,20 +258,24 @@ void CollisionParticleWithSphere(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::
 
 		// Usaremos la equación de la recta y la equacion de la esfera.
 		// Sacaremos una equiacion Ax^2 + bx + c = 0 para descubrir la alfa
-		float a = glm::pow(p0.x - Sphere::posSphere.x, 2) + glm::pow(p0.y - Sphere::posSphere.y, 2) + glm::pow(p0.z - Sphere::posSphere.z, 2) - glm::pow(Sphere::radiusSphere, 2) +
-			2 * ((p0.x - Sphere::posSphere.x) + (p0.y - Sphere::posSphere.y) + (p0.z - Sphere::posSphere.z));
-		float b = 2 * ((p.x - p0.x) + (p.y - p0.y) + (p.z - p0.z));
-		float c = glm::pow(glm::pow(p.x - p0.x, 2) + glm::pow(p.y - p0.y, 2) + glm::pow(p.z - p0.z, 2), 2);
+		//float a = glm::pow(p0.x - Sphere::posSphere.x, 2) + glm::pow(p0.y - Sphere::posSphere.y, 2) + glm::pow(p0.z - Sphere::posSphere.z, 2) - glm::pow(Sphere::radiusSphere, 2) +
+		//	2 * ((p0.x - Sphere::posSphere.x) + (p0.y - Sphere::posSphere.y) + (p0.z - Sphere::posSphere.z));
+		//float b = 2 * ((p.x - p0.x) + (p.y - p0.y) + (p.z - p0.z));
+		//float c = glm::pow(glm::pow(p.x - p0.x, 2) + glm::pow(p.y - p0.y, 2) + glm::pow(p.z - p0.z, 2), 2);
+		//
+		//alfa1 = -b  +  glm::sqrt(glm::pow(b, 2) - (4 * a*c))  /  2 * a;
+		//alfa2 = -b - glm::sqrt(glm::pow(b, 2) - (4 * a*c)) / 2 * a;
+		//
+		//(glm::abs(alfa1) > glm::abs(alfa2)) ? resultAlfa = alfa2 : resultAlfa = alfa1;
+		//
+		//// recta: r = p0 + &p0p; buscaremos el valor "&".
+		//// Una vez tengamos alfa conoceremos el punto de colision.
+		//glm::vec3 PuntoColision = { p0.x + p0p.x *resultAlfa, p0.y + p0p.y *resultAlfa, p0.z + p0p.z *resultAlfa };
+		//glm::vec3 n = glm::normalize(PuntoColision - Sphere::posSphere);
 
-		alfa1 = -b  +  glm::sqrt(glm::pow(b, 2) - (4 * a*c))  /  2 * a;
-		alfa2 = -b - glm::sqrt(glm::pow(b, 2) - (4 * a*c)) / 2 * a;
-
-		(glm::abs(alfa1) > glm::abs(alfa2)) ? resultAlfa = alfa2 : resultAlfa = alfa1;
-
-		// recta: r = p0 + &p0p; buscaremos el valor "&".
-		// Una vez tengamos alfa conoceremos el punto de colision.
-		glm::vec3 PuntoColision = { p0.x + p0p.x *resultAlfa, p0.y + p0p.y *resultAlfa, p0.z + p0p.z *resultAlfa };
-		glm::vec3 n = glm::normalize(PuntoColision - Sphere::posSphere);
+		glm::vec3 PuntoColision;
+		glm::vec3 n;
+		glm::intersectLineSphere(p, p0, Sphere::posSphere, Sphere::radiusSphere, PuntoColision, n);
 		float D = -glm::dot(n, PuntoColision);
 		CollisionParticlePlane(p0, p, v0, v, n, D);
 	}
@@ -313,17 +318,8 @@ void ParticleMovement(int currParticle, float dt) {
 	glm::vec3 f = ptrParticlesForce[currParticle];
 	glm::vec3 p = p0 + (p0 - _p0) + (f / mass) * glm::pow(dt, 2);
 	glm::vec3 v = (p - p0) / dt;
-		
 	
 	CheckCollisions(p0, p, v0, v);
-	
-	/*glm::vec3 prevP = ptrParticlesPos[currParticle - 1];
-	glm::vec3 v_P1P2 = prevP - p;
-
-	if (glm::length(v_P1P2) > particleLink)
-	{
-		p= prevP + (glm::normalize(v_P1P2) * particleLink);
-	}*/
 
 	ptrParticlesPos0[currParticle] = p0;
 	ptrParticlesPos[currParticle] = p;
@@ -737,6 +733,23 @@ void UpdateParticles(float dt) {
 			ParticleMovement(i, dt);
 		}
 	}
+
+
+	/*glm::vec3 prevP;
+	glm::vec3 v_P1P2; 
+	for (int n = 0; n < 10; n++)
+	{
+		for (int i = 0; i < ClothMesh::numVerts; i++) {
+			if (i != 0 && i != ClothMesh::numCols - 1) {
+				prevP = ptrParticlesPos[i - 1];
+				v_P1P2 = prevP - ptrParticlesPos[i];
+				if (glm::length(v_P1P2) > particleLink)
+				{
+					ptrParticlesPos[i] = prevP + (glm::normalize(v_P1P2) * particleLink);
+				}
+			}
+		}
+	}*/
 }
 
 void PhysicsUpdate(float dt) {
@@ -745,8 +758,11 @@ void PhysicsUpdate(float dt) {
 		if (currTime >= resetTime) {
 			PhysicsReinit();
 		}
-		
-		UpdateParticles(dt);
+		for (int i = 0; i < 10; i++)
+		{
+			//dt /= 10.0f;
+			UpdateParticles(dt/10.0);
+		}
 	}
 	else if (lastParticleLink != particleLink) {
 		lastParticleLink = particleLink;
