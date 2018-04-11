@@ -123,10 +123,10 @@ struct StructCube {
 	}
 
 	void InitVertexs() {
-		glm::vec3 vertex;
+		glm::vec3 currVertex;
 		for (int i = 0; i < VERTEXS_CUBE; i++) {
-			vertex = Cube::verts[i];
-			vertexs0[i] = vertexs[i] = vertex;
+			currVertex = Cube::verts[i];
+			vertexs0[i] = vertexs[i] = pos + currVertex;
 		}
 	}
 

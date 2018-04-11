@@ -151,8 +151,8 @@ void InitParticles() {
 }
 
 void InitSphere() {
-	float x = rand() % static_cast<int>(min_Pos_Sphere - (max_Pos_Sphere-2));
-	float y = rand() % static_cast<int>((min_Pos_Sphere+1) - (max_Pos_Sphere+3));
+	float x = min_Pos_Sphere + (rand() % static_cast<int>((max_Pos_Sphere - 2) - min_Pos_Sphere + 1));
+	float y = (min_Pos_Sphere + 1) + (rand() % static_cast<int>((max_Pos_Sphere + 3) - (min_Pos_Sphere + 1) + 1));
 	float z = 0.0f;
 
 	Sphere::posSphere = { x, y, z };
@@ -758,10 +758,10 @@ void PhysicsUpdate(float dt) {
 		if (currTime >= resetTime) {
 			PhysicsReinit();
 		}
-		for (int i = 0; i < 10; i++)
-		{
-			//dt /= 10.0f;
-			UpdateParticles(dt/10.0);
+
+		const float NUM_UPDATES = 10.f;
+		for (int i = 0; i < static_cast<int>(NUM_UPDATES); i++){
+			UpdateParticles(dt / NUM_UPDATES);
 		}
 	}
 	else if (lastParticleLink != particleLink) {

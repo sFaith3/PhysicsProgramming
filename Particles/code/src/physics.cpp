@@ -4,6 +4,7 @@
 #include <SDL2\SDL.h>
 #include "constants.h"
 #include <vector>
+#include <glm\gtx\intersect.hpp>
 
 namespace LilSpheres {
 	extern const int maxParticles;
@@ -406,26 +407,27 @@ void CollisionParticleWithSphere(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::
 		glm::vec3 p0p = p - p0;
 		float alfa1 = 0, alfa2 = 0, resultAlfa = 0;
 
-		// Usaremos la equación de la recta y la equacion de la esfera.
-		// Sacaremos una equiacion Ax^2 + bx + c = 0 para descubrir la alfa
-		float a = glm::pow(p0.x - Sphere::posSphere.x, 2) + glm::pow(p0.y - Sphere::posSphere.y, 2) + glm::pow(p0.z - Sphere::posSphere.z, 2) - glm::pow(Sphere::radiusSphere, 2) +
-			2 * ((p0.x - Sphere::posSphere.x) + (p0.y - Sphere::posSphere.y) + (p0.z - Sphere::posSphere.z));
-		float b = 2 * ((p.x - p0.x) + (p.y - p0.y) + (p.z - p0.z));
-		float c = glm::pow(glm::pow(p.x - p0.x, 2) + glm::pow(p.y - p0.y, 2) + glm::pow(p.z - p0.z, 2),2);
+		//// Usaremos la equación de la recta y la equacion de la esfera.
+		//// Sacaremos una equiacion Ax^2 + bx + c = 0 para descubrir la alfa
+		//float a = glm::pow(p0.x - Sphere::posSphere.x, 2) + glm::pow(p0.y - Sphere::posSphere.y, 2) + glm::pow(p0.z - Sphere::posSphere.z, 2) - glm::pow(Sphere::radiusSphere, 2) +
+		//	2 * ((p0.x - Sphere::posSphere.x) + (p0.y - Sphere::posSphere.y) + (p0.z - Sphere::posSphere.z));
+		//float b = 2 * ((p.x - p0.x) + (p.y - p0.y) + (p.z - p0.z));
+		//float c = glm::pow(glm::pow(p.x - p0.x, 2) + glm::pow(p.y - p0.y, 2) + glm::pow(p.z - p0.z, 2), 2);
+		//
+		//alfa1 = -b  +  glm::sqrt(glm::pow(b, 2) - (4 * a*c))  /  2 * a;
+		//alfa2 = -b - glm::sqrt(glm::pow(b, 2) - (4 * a*c)) / 2 * a;
+		//
+		//(glm::abs(alfa1) > glm::abs(alfa2)) ? resultAlfa = alfa2 : resultAlfa = alfa1;
+		//
+		//// recta: r = p0 + &p0p; buscaremos el valor "&".
+		//// Una vez tengamos alfa conoceremos el punto de colision.
+		//glm::vec3 PuntoColision = { p0.x + p0p.x *resultAlfa, p0.y + p0p.y *resultAlfa, p0.z + p0p.z *resultAlfa };
+		//glm::vec3 n = glm::normalize(PuntoColision - Sphere::posSphere);
+		//float D = -glm::dot(n, PuntoColision);
 
-		alfa1 = -b;
-		alfa1 += glm::sqrt(glm::pow(b, 2) - 4 * a*c);
-		alfa1 /= 2 * a;
-		alfa2 = -b;
-		alfa2 -= glm::sqrt(glm::pow(b, 2) - 4 * a*c);
-		alfa2 /= 2 * a;
-
-		(glm::abs(alfa1) > glm::abs(alfa2)) ? resultAlfa = alfa2 : resultAlfa = alfa1;
-
-		// recta: r = p0 + &p0p; buscaremos el valor "&".
-		// Una vez tengamos alfa conoceremos el punto de colision.
-		glm::vec3 PuntoColision = { p0.x + p0p.x *resultAlfa, p0.y + p0p.y *resultAlfa, p0.z + p0p.z *resultAlfa };
-		glm::vec3 n = glm::normalize(PuntoColision - Sphere::posSphere);
+		glm::vec3 PuntoColision;
+		glm::vec3 n;
+		glm::intersectLineSphere(p, p0, Sphere::posSphere, Sphere::radiusSphere, PuntoColision, n);
 		float D = -glm::dot(n, PuntoColision);
 
 		CollisionParticlePlane(p0, p, v0, v, n, D);
