@@ -4,11 +4,12 @@
 #include <imgui\imgui.h>
 #include <imgui\imgui_impl_sdl_gl3.h>
 #include <cstdio>
+#include <time.h>
 
 #include "GL_framework.h"
 
 
-extern void PhysicsInit();
+extern void PhysicsInit(float dt);
 extern void PhysicsUpdate(float dt);
 extern void PhysicsCleanup();
 extern void GUI();
@@ -41,6 +42,8 @@ namespace {
 }
 
 int main(int argc, char** argv) {
+	srand(time(NULL));
+
 	//Init GLFW
 	if (SDL_Init(SDL_INIT_VIDEO) != 0) {
 		SDL_Log("Couldn't initialize SDL: %s", SDL_GetError());
@@ -83,7 +86,7 @@ int main(int argc, char** argv) {
 	SDL_GL_GetDrawableSize(mainwindow, &display_w, &display_h);
 	// Init scene
 	GLinit(display_w, display_h);
-	PhysicsInit();
+	PhysicsInit((float)expected_frametime);
 	// Setup ImGui binding
 	ImGui_ImplSdlGL3_Init(mainwindow);
 
