@@ -34,6 +34,8 @@ const glm::mat3 I_BODY_MAT = {
 };
 const glm::mat3 I_BODY_MAT_INVERSE = glm::inverse(I_BODY_MAT);
 
+const float Epsilon = .1f;
+
 /////// fw declarations
 void CheckCollisions(glm::vec3 p0, glm::vec3 &p);
 
@@ -65,13 +67,22 @@ struct StructCube {
 		return transMatrix;
 	}
 
-	void UpdateCollisions() {
+	void UpdateCollisions(float dt) {
 		for (int i = 0; i < VERTEXS_CUBE; i++) {
 			CheckCollisions(vertexs0[i], vertexs[i]);
 		}
 	}
 
-	void UpdateMovement(float dt) {
+	void UpdateVertexs() {
+		glm::vec3 currVertex;
+		for (int i = 0; i < VERTEXS_CUBE; i++) {
+			currVertex = Cube::verts[i];
+			vertexs0[i] = vertexs[i];
+			vertexs[i] = pos + currVertex;
+		}
+	}
+
+	void RigidBodyMotion(float dt) {
 		// P(t + dt) = P(t) + dt * F(t)
 		linearMomentum += dt * F;
 
@@ -98,9 +109,17 @@ struct StructCube {
 		F = GRAVITY;
 	}
 
+	void UpdateMovement(float dt) {
+		RigidBodyMotion(dt);
+		UpdateVertexs();
+	}
+
 	void Update(float dt) {
+		const int NUM_UPDATES = 10;
+		for (int i = 1; i < NUM_UPDATES; i++) {
+			UpdateCollisions(dt / i);
+		}
 		UpdateMovement(dt);
-		UpdateCollisions();
 
 		glm::mat4 transMatrix = GetTransMatrix();
 		Cube::updateCube(transMatrix);
@@ -213,7 +232,7 @@ void InitPlanes() {
 /*
  * Collision Correction - Impulse
  */
-void CollisionParticlePlane(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 &v, glm::vec3 n, float d) {
+void CollisionParticlePlane(glm::vec3 p0, glm::vec3 &p, glm::vec3 n, float d) {
 	// TODO
 }
 
@@ -227,11 +246,13 @@ void CollisionParticleWithWallsAndGround(glm::vec3 p0, glm::vec3 &p) {
 		n = currPlane.normal;
 
 		d = (glm::dot(n, p) + currPlane.D) * (glm::dot(n, p0) + currPlane.D);
-		if (d < 0.0f) {
-			//CollisionParticlePlane(p0, p, v0, v, n, currPlane.D);
-			std::cout << "Collision\n";//
+		if (d < Epsilon) {
+			if (d < 0.f) break;
+
+			CollisionParticlePlane(p0, p, n, currPlane.D);
 			break;
 		}
+		
 	}
 }
 
