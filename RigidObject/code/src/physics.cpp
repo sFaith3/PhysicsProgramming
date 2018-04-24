@@ -120,10 +120,10 @@ struct StructCube {
 	void Update(float dt) {
 		const int NUM_UPDATES = 10;
 		for (int i = 1; i < NUM_UPDATES; i++) {
-			UpdateCollisions(dt / i);
+			UpdateCollisions(dt/i);
+			
 		}
 		UpdateMovement(dt);
-
 		glm::mat4 transMatrix = GetTransMatrix();
 		Cube::updateCube(transMatrix);
 	}
@@ -240,25 +240,25 @@ void CollisionParticlePlane(glm::vec3 p0, glm::vec3 &p, glm::vec3 n, float d, gl
 	//Calculamos "pä": velocidad Vertice que ha colisionado en el plano.
 	// pä = va(t0) + wa(t0) x (pa(t0)- xa(t0));
 	// ra = (pa(t0) - xa(t0));
-	glm::vec3 ra = p - posCube;
+	glm::vec3 ra = p-posCube ;
 	glm::vec3 particleVel = v + glm::cross(w, ra);
 
 	//Calculamos vrel
 	//Vrel = n(t0) * (pä(t0)-pb(to)); pb = 0;
 	float Vrel = glm::dot(n, particleVel);
 	
+
+	//if(Vre)
 	//Una vez Calculada Vrel la utilizaremos para calcular la J
 	//j = -(1 - coefElasticidad)*Vrel / ((1/Ma) + n(t0) * (Ia^-1(t0) (ra x n(t0))) x ra);
-	float j = -(1 + coefElastic)*Vrel / (1 / MASS) + glm::dot(n, glm::cross(I*(glm::cross(ra, n)), ra));
+	float j = -((1 + coefElastic)*Vrel) / (((1 / MASS) + glm::dot(n, glm::cross(I*(glm::cross(ra, n)), ra))));
 	//J=j*n;
 	glm::vec3 J = j*n;
 	// T = ra x J;
 	glm::vec3 T = glm::cross(ra, J);
 
-	P += J;
-	L += T;
-
-		
+	P += J/50.f;
+	L += T/50.0f;		
 	 
 }
 
