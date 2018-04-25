@@ -34,10 +34,12 @@ const glm::mat3 I_BODY_MAT = {
 };
 const glm::mat3 I_BODY_MAT_INVERSE = glm::inverse(I_BODY_MAT);
 
-const float Epsilon = .1f;
+const float EPSILON = .2f;
+
+const float RESET_TIME = 5.f;
 
 /////// fw declarations
-void CheckCollisions(glm::vec3 p0, glm::vec3 &p, glm::vec3 v,glm::vec3 w , glm::vec3 posCube, glm::mat3 I,glm::vec3 &P, glm::vec3 &L);
+void CheckCollisions(glm::vec3 p0, glm::vec3 &p, glm::vec3 v, glm::vec3 w, glm::vec3 posCube, glm::mat3 I, glm::vec3 &P, glm::vec3 &L);
 
 /////// Structs
 struct Plane {
@@ -58,7 +60,6 @@ struct StructCube {
 
 	glm::mat4 GetTransMatrix() {
 		glm::mat3 R = glm::mat3_cast(rot);
-
 		glm::mat4 transMatrix = {
 			R[0][0], R[0][1], R[0][2], 0.f,
 			R[1][0], R[1][1], R[1][2], 0.f,
@@ -69,19 +70,20 @@ struct StructCube {
 		return transMatrix;
 	}
 
-	void UpdateCollisions(float dt) {
+	void UpdateCollisions() {
 		for (int i = 0; i < VERTEXS_CUBE; i++) {
-			CheckCollisions(vertexs0[i], vertexs[i],v,w,pos,I,linearMomentum,angMomentum);
-			
+			CheckCollisions(vertexs0[i], vertexs[i], v, w, pos, I, linearMomentum, angMomentum);
 		}
 	}
 
 	void UpdateVertexs() {
 		glm::vec3 currVertex;
+		glm::mat3 R = glm::mat3_cast(rot);
+
 		for (int i = 0; i < VERTEXS_CUBE; i++) {
 			currVertex = Cube::verts[i];
 			vertexs0[i] = vertexs[i];
-			vertexs[i] = pos + currVertex;
+			vertexs[i] = pos + (R * currVertex);
 		}
 	}
 
@@ -93,19 +95,23 @@ struct StructCube {
 		v = linearMomentum / MASS;
 		// x(t + dt) = x(t) + dt * v(t + dt);
 		pos += dt * v;
+		/*if (pos.y < EPSILON) {
+			pos.y = EPSILON;
+			return;
+		}*/
 
 		// I(t)^-1 = R(t) * I^-1 * R(t)^T
 		glm::mat3 R = glm::mat3_cast(rot);
 		I = R * I_BODY_MAT_INVERSE * glm::transpose(R);
 		// w(t) = I(t)^-1 * L(t + dt)
 		w = I * angMomentum;
-		// R(t + dt) = R(t) + dt * (w(t) * R(t))
+		// R(t + dt) = R(t) + dt * ((0.5 * w(t)) * R(t))
 		/*glm::mat3 W = {
 		0.f, -w.z, w.y,
 		w.z, 0.f, -w.x,
 		-w.y, w.x, 0.f
 		};
-		rotCube += dt * (W * rotCube);*/
+		rotCube += dt * ((0.5f * W) * rotCube);*/
 		rot += dt * ((0.5f * glm::quat(0.f, w)) * rot);
 		rot = glm::normalize(rot);
 
@@ -118,12 +124,9 @@ struct StructCube {
 	}
 
 	void Update(float dt) {
-		const int NUM_UPDATES = 10;
-		for (int i = 1; i < NUM_UPDATES; i++) {
-			UpdateCollisions(dt/i);
-			
-		}
+		UpdateCollisions();
 		UpdateMovement(dt);
+
 		glm::mat4 transMatrix = GetTransMatrix();
 		Cube::updateCube(transMatrix);
 	}
@@ -170,6 +173,8 @@ Plane planes[6];
 float coefElastic, coefFriction;
 
 StructCube cube;
+
+float currentTime;
 
 bool show_test_window = false;
 
@@ -236,33 +241,31 @@ void InitPlanes() {
  * Collision Correction - Impulse
  */
 void CollisionParticlePlane(glm::vec3 p0, glm::vec3 &p, glm::vec3 n, float d, glm::vec3 v, glm::vec3 w, glm::vec3 posCube, glm::mat3 I, glm::vec3 &P, glm::vec3 &L) {
-
 	//Calculamos "pä": velocidad Vertice que ha colisionado en el plano.
 	// pä = va(t0) + wa(t0) x (pa(t0)- xa(t0));
 	// ra = (pa(t0) - xa(t0));
-	glm::vec3 ra = p-posCube ;
+	glm::vec3 ra = p - posCube ;
 	glm::vec3 particleVel = v + glm::cross(w, ra);
 
 	//Calculamos vrel
 	//Vrel = n(t0) * (pä(t0)-pb(to)); pb = 0;
 	float Vrel = glm::dot(n, particleVel);
 	
+	if (Vrel < 0.f){
+		//Una vez Calculada Vrel la utilizaremos para calcular la J
+		// j = -(1 - coefElasticidad) * Vrel / ((1/Ma) + n(t0) * (Ia^-1(t0) (ra x n(t0))) x ra);
+		float j = -((1 + coefElastic) * Vrel) / ((1 / MASS) + glm::dot(n, glm::cross(I * glm::cross(ra, n), ra)));
+		// J = j * n;
+		glm::vec3 J = j * n;
+		// T = ra x J;
+		glm::vec3 T = glm::cross(ra, J);
 
-	//if(Vre)
-	//Una vez Calculada Vrel la utilizaremos para calcular la J
-	//j = -(1 - coefElasticidad)*Vrel / ((1/Ma) + n(t0) * (Ia^-1(t0) (ra x n(t0))) x ra);
-	float j = -((1 + coefElastic)*Vrel) / (((1 / MASS) + glm::dot(n, glm::cross(I*(glm::cross(ra, n)), ra))));
-	//J=j*n;
-	glm::vec3 J = j*n;
-	// T = ra x J;
-	glm::vec3 T = glm::cross(ra, J);
-
-	P += J/50.f;
-	L += T/50.0f;		
-	 
+		P += J;
+		L += T;
+	}
 }
 
-void CollisionParticleWithWallsAndGround(glm::vec3 p0, glm::vec3 &p, glm::vec3 v,glm::vec3 w , glm::vec3 posCube,glm::mat3 I, glm::vec3 &P, glm::vec3 &L) {
+void CollisionParticleWithWallsAndGround(glm::vec3 p0, glm::vec3 &p, glm::vec3 v, glm::vec3 w, glm::vec3 posCube, glm::mat3 I, glm::vec3 &P, glm::vec3 &L) {
 	Plane currPlane;
 	glm::vec3 n;
 	float d;
@@ -272,29 +275,36 @@ void CollisionParticleWithWallsAndGround(glm::vec3 p0, glm::vec3 &p, glm::vec3 v
 		n = currPlane.normal;
 
 		d = (glm::dot(n, p) + currPlane.D) * (glm::dot(n, p0) + currPlane.D);
-		if (d < Epsilon) {
-			if (d < 0.f) break;
-
-			CollisionParticlePlane(p0, p, n, currPlane.D,v,w,posCube,I,P,L);
-			break;
+		if (d <= EPSILON && d >= 0.f) {
+			CollisionParticlePlane(p0, p, n, currPlane.D, v, w, posCube, I, P, L);
 		}
-		
 	}
 }
 
-void CheckCollisions(glm::vec3 p0, glm::vec3 &p, glm::vec3 v, glm::vec3 w, glm::vec3 posCube,glm::mat3 I, glm::vec3 &P, glm::vec3 &L) {
-	CollisionParticleWithWallsAndGround(p0, p,v,w,posCube,I,P,L);
+void CheckCollisions(glm::vec3 p0, glm::vec3 &p, glm::vec3 v, glm::vec3 w, glm::vec3 posCube, glm::mat3 I, glm::vec3 &P, glm::vec3 &L) {
+	CollisionParticleWithWallsAndGround(p0, p, v, w, posCube, I, P, L);
+}
+
+void Reset(float dt) {
+	currentTime = 0.f;
+	cube.Init(dt);
 }
 
 void PhysicsInit(float dt) {
 	coefElastic = DEF_COEF_ELASTIC;
 	coefFriction = DEF_COEF_FRICTION;
+	currentTime = 0.f;
 
 	InitPlanes();
 	cube.Init(dt);
 }
 
 void PhysicsUpdate(float dt) {
+	currentTime += dt;
+	if (currentTime >= RESET_TIME) {
+		Reset(dt);
+	}
+
 	cube.Update(dt);
 }
 
