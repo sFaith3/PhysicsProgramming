@@ -8,9 +8,8 @@ using namespace std;
 
 
 namespace ClothMesh {
-	 void setupClothMesh();
-	 void cleanupClothMesh();
-	 void updateClothMesh(float* array_data);
+	 extern void cleanupClothMesh();
+	 extern void updateClothMesh(float* array_data);
 	 extern const int numCols;
 	 extern const int numRows;
 	 extern const int numVerts;
