@@ -5,6 +5,7 @@
 #include <vector>
 #include <array>
 #include <iostream>
+#include <vector>
 
 
 ///////////////
@@ -48,7 +49,8 @@ float particleLink;
 
 glm::vec3 *ptrWaveParticlesPos0 = new glm::vec3[ClothMesh::numVerts];
 glm::vec3 *ptrWaveParticlesPos = new glm::vec3[ClothMesh::numVerts];
-glm::vec3 dirWave; //TODO array/vector de vec3 que indica el num de olas
+std::vector<glm::vec3> dirWave(2,glm::vec3(0.0f, 0.0f, 0.0f)); //TODO array/vector de vec3 que indica el num de olas
+
 float amplitudeWave; // Probamos con 2 o 1
 float w; // Frecuéncia ola
 
@@ -73,7 +75,7 @@ void GUI() {
 		ImGui::DragFloat("Particle Link", &particleLink, 1.0f, 0.0f, 10.0f);
 
 		if (ImGui::TreeNode("Wave")) {
-			ImGui::DragFloat3("Direction", &dirWave.x, 1.0f);
+			ImGui::DragFloat3("Direction", &dirWave[0].x, 1.0f);
 			ImGui::DragFloat("Amplitude", &amplitudeWave, 1.0f, 0.0f, 10.0f);
 			ImGui::DragFloat("Frecuency", &w, 1.0f, 0.0f, 10.0f);
 
@@ -118,10 +120,17 @@ void InitClothMesh() {
 
 void UpdateWave() {
 	float modDirWave;
-	for (int i = 0; i < ClothMesh::numVerts; i++) {
-		modDirWave = glm::length(dirWave);
-		ptrWaveParticlesPos[i] = ptrWaveParticlesPos0[i] - (dirWave / modDirWave) * amplitudeWave * sin(glm::dot(dirWave, ptrWaveParticlesPos0[i]) - (w * currentTime));
-		ptrWaveParticlesPos[i].y = /*posInit + */ amplitudeWave * cos(glm::dot(dirWave, ptrWaveParticlesPos0[i]) - (w * currentTime));
+
+	
+		for (int i = 0; i < ClothMesh::numVerts; i++) {
+
+			ptrWaveParticlesPos[i] = glm::vec3(0.0f);
+			for (int j = 0; j < dirWave.size(); j++)
+			{
+			modDirWave = glm::length(dirWave[j]);
+			ptrWaveParticlesPos[i] += ptrWaveParticlesPos0[i] - (dirWave[j] / modDirWave) * amplitudeWave * sin(glm::dot(dirWave[j], ptrWaveParticlesPos0[i]) - (w * currentTime));
+			ptrWaveParticlesPos[i].y += /*posInit + */ amplitudeWave * cos(glm::dot(dirWave[j], ptrWaveParticlesPos0[i]) - (w * currentTime));
+		}
 	}
 }
 
@@ -142,7 +151,12 @@ void PhysicsInit() {
 
 	particleLink = INIT_PARTICLE_LINK;
 
-	dirWave = INIT_DIR_WAVE;
+	/*for (int i = 0; i < dirWave.size(); i++)
+	{*/
+		dirWave[0]=INIT_DIR_WAVE;
+		dirWave[1] = glm::vec3(0.0f,0.0f,0.7f);
+	//}
+
 	amplitudeWave = INIT_AMP_WAVE;
 	w = INIT_W;
 
