@@ -2,6 +2,7 @@
 #include <imgui\imgui_impl_sdl_gl3.h>
 #include <glm\glm.hpp>
 #include <glm\gtx\quaternion.hpp>
+#include <glm\gtx\intersect.hpp>
 #include <vector>
 #include <array>
 #include <iostream>
@@ -15,9 +16,16 @@ const float INIT_RESET_TIME = 10.f;
 
 const float INIT_PARTICLE_LINK = .5f;
 
+const float min_Pos_Sphere = 0.f;
+const float max_Pos_Sphere = 4.f;
 const glm::vec3 INIT_DIR_WAVE = glm::vec3(1.f, 0.f, 0.f);
 const float INIT_AMP_WAVE = 1.f;
 const float INIT_W = 2.f;
+const glm::vec3 default_Grav_Accel = glm::vec3(0.0f, -9.81f, 0.0f);
+const float mass = 1.0f;
+
+const float default_Elastic_Coef = 0.5f;
+const float default_Friction_Coef = 0.1f;
 
 /////// fw declarations
 namespace ClothMesh {
@@ -29,6 +37,13 @@ namespace ClothMesh {
 }
 
 namespace Sphere {
+
+	glm::vec3 SpherePos;
+	glm::vec3 SpherePos0;
+	glm::vec3 SphereForce;
+	glm::vec3 SphereSpeed;
+	float radiusSphere;
+
 	extern void setupSphere(glm::vec3 pos = glm::vec3(0.f, 1.f, 0.f), float radius = 1.f);
 	extern void cleanupSphere();
 	extern void updateSphere(glm::vec3 pos, float radius = 1.f);
@@ -39,6 +54,7 @@ void PhysicsInit();
 /////// structs
 
 
+
 /////// local variables
 bool isPlaying;
 
@@ -47,17 +63,31 @@ float currentTime;
 
 float particleLink;
 
+glm::vec3 vGravAccel = default_Grav_Accel;
 glm::vec3 *ptrWaveParticlesPos0 = new glm::vec3[ClothMesh::numVerts];
 glm::vec3 *ptrWaveParticlesPos = new glm::vec3[ClothMesh::numVerts];
-std::vector<glm::vec3> dirWave(2,glm::vec3(0.0f, 0.0f, 0.0f)); //TODO array/vector de vec3 que indica el num de olas
+std::vector<glm::vec3> dirWave(3,glm::vec3(1.0f, 0.0f, 0.0f)); //TODO array/vector de vec3 que indica el num de olas
 
 float amplitudeWave; // Probamos con 2 o 1
 float w; // Frecuéncia ola
 
+float elasticCoef, frictionCoef;
 bool show_test_window = false;
 
 ///////////////
 
+void InitSphere() {
+	float x = min_Pos_Sphere + (rand() % static_cast<int>((max_Pos_Sphere - 2) - min_Pos_Sphere + 1));
+	float y = (min_Pos_Sphere + 1) + (rand() % static_cast<int>((max_Pos_Sphere + 3) - (min_Pos_Sphere + 1) + 1));
+	float z = 0.0f;
+
+
+	Sphere::SpherePos = Sphere::SpherePos0 = glm::vec3(x,10.f,z);
+	Sphere::SphereSpeed = vGravAccel;
+	Sphere::SphereForce = mass * vGravAccel;
+	Sphere::radiusSphere = 1.0f;
+	Sphere::updateSphere(Sphere::SpherePos, Sphere::radiusSphere);
+}
 
 void GUI() {
 	bool show = true;
@@ -101,7 +131,7 @@ void InitParticles() {
 
 void InitClothMesh() {
 	float posX, posY, posZ;
-	posY = 10.0f;
+	posY = 0.0f;
 
 	posX = 4.0f;
 	int cont = 0;
@@ -121,16 +151,20 @@ void InitClothMesh() {
 void UpdateWave() {
 	float modDirWave;
 
-	
 		for (int i = 0; i < ClothMesh::numVerts; i++) {
 
-			ptrWaveParticlesPos[i] = glm::vec3(0.0f);
+			
+			ptrWaveParticlesPos[i] = ptrWaveParticlesPos0[i];
+		
 			for (int j = 0; j < dirWave.size(); j++)
 			{
 			modDirWave = glm::length(dirWave[j]);
-			ptrWaveParticlesPos[i] += ptrWaveParticlesPos0[i] - (dirWave[j] / modDirWave) * amplitudeWave * sin(glm::dot(dirWave[j], ptrWaveParticlesPos0[i]) - (w * currentTime));
-			ptrWaveParticlesPos[i].y += /*posInit + */ amplitudeWave * cos(glm::dot(dirWave[j], ptrWaveParticlesPos0[i]) - (w * currentTime));
-		}
+			ptrWaveParticlesPos[i] -= (dirWave[j] / modDirWave) * amplitudeWave * sin(glm::dot(dirWave[j], ptrWaveParticlesPos0[i]) - (w * currentTime));
+			ptrWaveParticlesPos[i].y += amplitudeWave * cos(glm::dot(dirWave[j], ptrWaveParticlesPos0[i]) - (w * currentTime));
+			
+			
+			}
+			ptrWaveParticlesPos[i].y += 3.0f;
 	}
 }
 
@@ -139,7 +173,7 @@ void Reset() {
 
 	InitParticles();
 	InitClothMesh();
-
+	InitSphere();
 	ClothMesh::updateClothMesh((float*)ptrWaveParticlesPos);
 }
 
@@ -148,13 +182,18 @@ void PhysicsInit() {
 
 	resetTime = INIT_RESET_TIME;
 	currentTime = 0.f;
+	elasticCoef = default_Elastic_Coef;
+	frictionCoef = default_Friction_Coef;
 
 	particleLink = INIT_PARTICLE_LINK;
 
 	/*for (int i = 0; i < dirWave.size(); i++)
 	{*/
-		dirWave[0]=INIT_DIR_WAVE;
-		dirWave[1] = glm::vec3(0.0f,0.0f,0.7f);
+		dirWave[0] = glm::vec3(0.3f, 0.0f, 0.0f);//INIT_DIR_WAVE;
+		dirWave[1] = glm::vec3(0.0f, 0.0f, 0.4f);
+		dirWave[2] = glm::vec3(0.2f, 0.0f, 0.2f);
+		/*dirWave[3] = glm::vec3(1.0f, 0.0f, 0.0f);
+		dirWave[4] = glm::vec3(0.0f, 0.0f, 0.5f);*/
 	//}
 
 	amplitudeWave = INIT_AMP_WAVE;
@@ -162,10 +201,37 @@ void PhysicsInit() {
 
 	InitParticles();
 	InitClothMesh();
+	InitSphere();
+	for (int i = 0; i < ClothMesh::numVerts; i++) {
+		ptrWaveParticlesPos[i].y -= 9.0f;
 
+	}
 	ClothMesh::updateClothMesh((float*)ptrWaveParticlesPos);
 }
 
+
+void SphereMovement(float dt) {
+
+	glm::vec3 _p0 = Sphere::SpherePos0;
+	glm::vec3  p0 = Sphere::SpherePos;
+	glm::vec3  v0 = Sphere::SphereSpeed;
+
+	//Verlet
+	glm::vec3 f = Sphere::SphereForce;
+	glm::vec3 p = p0 + (p0 - _p0) + (f / mass) * glm::pow(dt, 2);
+	glm::vec3 v = (p - p0) / dt;
+
+ 
+	//glm::vec3 tmp = amplitudeWave * cos(glm::dot(dirWave[j], p) - (w * currentTime));
+
+	//if(tmp.y) ? > possphera - Radio -> Está hundido != -> Aun no ha llegado.
+	//Si está hundido -> Fflotacion = 1.f * 9.8 (modulo de la gravedad = mag grav) * Volumen Sumergido =(dEsphera * dEsphera * alturaSumergida (tmp- (posSphera - radio))) * y (0,1,0);  
+
+	Sphere::SpherePos0 = p0;
+	Sphere::SpherePos = p;
+	Sphere::SphereSpeed = v;
+
+}
 void PhysicsUpdate(float dt) {
 	if (isPlaying) {
 		currentTime += dt;
@@ -174,7 +240,10 @@ void PhysicsUpdate(float dt) {
 		}
 
 		UpdateWave();
-
+		
+		SphereMovement(dt);
+		Sphere::updateSphere(Sphere::SpherePos, 1);
+	
 		ClothMesh::updateClothMesh((float*)ptrWaveParticlesPos);
 	}
 }
