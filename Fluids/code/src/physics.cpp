@@ -15,14 +15,14 @@
 const float INIT_RESET_TIME = 10.f;
 
 const float INIT_PARTICLE_LINK = .5f;
-
-const float min_Pos_Sphere = 0.f;
+const float PI = 3.1415f;
+const float min_Pos_Sphere = 2.f;
 const float max_Pos_Sphere = 4.f;
 const glm::vec3 INIT_DIR_WAVE = glm::vec3(1.f, 0.f, 0.f);
 const float INIT_AMP_WAVE = 1.f;
 const float INIT_W = 2.f;
 const glm::vec3 default_Grav_Accel = glm::vec3(0.0f, -9.81f, 0.0f);
-const float mass = 1.0f;
+const float mass = 3.0f;
 
 const float default_Elastic_Coef = 0.5f;
 const float default_Friction_Coef = 0.1f;
@@ -242,6 +242,7 @@ void SphereMovement(float dt) {
 	{
 		distColisionSphera += amplitudeWave[i] * cos(glm::dot(dirWave[i], p) - (w[i]*currentTime));
 	}
+	distColisionSphera += 3.0f;
 
 	//if(tmp.y) ? > possphera - Radio -> Está hundido != -> Aun no ha llegado.
 	//Si está hundido -> Fflotacion = 1.f * 9.8 (modulo de la gravedad = mag grav) * Volumen Sumergido =(dEsphera * dEsphera * alturaSumergida (tmp- (posSphera - radio))) * y (0,1,0);  
@@ -257,7 +258,31 @@ void SphereMovement(float dt) {
 			VolumenSumerjido = dEsfera*dEsfera*dEsfera;
 		}
 		glm::vec3 Fflotacion = 1.0f * 9.8f * VolumenSumerjido * fContraria;
-		Sphere::SphereForce += Fflotacion;
+
+		//Fuerza de Drag;
+		//F = 0.5f * p * Cd * |A| * |U| * U
+		float p, Cd, A,modU;
+		glm::vec3 U;
+		p = 1.0f;
+		Cd = 2.0f;
+		U = Sphere::SphereSpeed;
+		modU = glm::length(U);
+		if (alturaSumerjida > Sphere::radiusSphere)
+		{
+			
+			A = PI * glm::pow(Sphere::radiusSphere, 2);
+		}
+		else
+		{
+			A = PI * glm::pow(glm::distance(distColisionSphera, Esferadistance), 2);
+		}
+		
+		glm::vec3 FDraf = -0.5f * p * Cd * A * modU * U;
+		Sphere::SphereForce += (Fflotacion + FDraf);
+
+
+
+
 	}
 	
 	Sphere::SpherePos0 = p0;
