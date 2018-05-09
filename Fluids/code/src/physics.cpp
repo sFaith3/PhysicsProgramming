@@ -66,10 +66,16 @@ float particleLink;
 glm::vec3 vGravAccel = default_Grav_Accel;
 glm::vec3 *ptrWaveParticlesPos0 = new glm::vec3[ClothMesh::numVerts];
 glm::vec3 *ptrWaveParticlesPos = new glm::vec3[ClothMesh::numVerts];
-std::vector<glm::vec3> dirWave(3,glm::vec3(1.0f, 0.0f, 0.0f)); //TODO array/vector de vec3 que indica el num de olas
 
-float amplitudeWave; // Probamos con 2 o 1
-float w; // Frecuéncia ola
+std::vector<glm::vec3> dirWave(3,glm::vec3(1.0f, 0.0f, 0.0f)); //TODO array/vector de vec3 que indica el num de olas
+std::vector<float> amplitudeWave(3, 0.0f); 
+std::vector<float> w(3, 0.0f); 
+/*
+amplitudeWave = INIT_AMP_WAVE;
+w = INIT_W;*/
+
+//float amplitudeWave; // Probamos con 2 o 1
+//float w; // Frecuéncia ola
 
 float elasticCoef, frictionCoef;
 bool show_test_window = false;
@@ -82,7 +88,7 @@ void InitSphere() {
 	float z = 0.0f;
 
 
-	Sphere::SpherePos = Sphere::SpherePos0 = glm::vec3(x,10.f,z);
+	Sphere::SpherePos = Sphere::SpherePos0 = glm::vec3(x,y,z);
 	Sphere::SphereSpeed = vGravAccel;
 	Sphere::SphereForce = mass * vGravAccel;
 	Sphere::radiusSphere = 1.0f;
@@ -104,13 +110,13 @@ void GUI() {
 		ImGui::DragFloat("Reset time", &resetTime, 1.0f, 0.0f, 10.0f);
 		ImGui::DragFloat("Particle Link", &particleLink, 1.0f, 0.0f, 10.0f);
 
-		if (ImGui::TreeNode("Wave")) {
+		/*if (ImGui::TreeNode("Wave")) {
 			ImGui::DragFloat3("Direction", &dirWave[0].x, 1.0f);
 			ImGui::DragFloat("Amplitude", &amplitudeWave, 1.0f, 0.0f, 10.0f);
 			ImGui::DragFloat("Frecuency", &w, 1.0f, 0.0f, 10.0f);
 
 			ImGui::TreePop();
-		}
+		}*/
 	}
 	
 	ImGui::End();
@@ -159,8 +165,8 @@ void UpdateWave() {
 			for (int j = 0; j < dirWave.size(); j++)
 			{
 			modDirWave = glm::length(dirWave[j]);
-			ptrWaveParticlesPos[i] -= (dirWave[j] / modDirWave) * amplitudeWave * sin(glm::dot(dirWave[j], ptrWaveParticlesPos0[i]) - (w * currentTime));
-			ptrWaveParticlesPos[i].y += amplitudeWave * cos(glm::dot(dirWave[j], ptrWaveParticlesPos0[i]) - (w * currentTime));
+			ptrWaveParticlesPos[i] -= (dirWave[j] / modDirWave) * amplitudeWave[j] * sin(glm::dot(dirWave[j], ptrWaveParticlesPos0[i]) - (w[j] * currentTime));
+			ptrWaveParticlesPos[i].y += amplitudeWave[j] * cos(glm::dot(dirWave[j], ptrWaveParticlesPos0[i]) - (w[j] * currentTime));
 			
 			
 			}
@@ -189,21 +195,28 @@ void PhysicsInit() {
 
 	/*for (int i = 0; i < dirWave.size(); i++)
 	{*/
-		dirWave[0] = glm::vec3(0.3f, 0.0f, 0.0f);//INIT_DIR_WAVE;
-		dirWave[1] = glm::vec3(0.0f, 0.0f, 0.4f);
-		dirWave[2] = glm::vec3(0.2f, 0.0f, 0.2f);
+		dirWave[0] = glm::vec3(0.8f, 0.0f, 0.0f);//INIT_DIR_WAVE;
+		dirWave[1] = glm::vec3(0.0f, 0.0f, 0.8f);
+		dirWave[2] = glm::vec3(0.8f, 0.0f, 0.0f);
 		/*dirWave[3] = glm::vec3(1.0f, 0.0f, 0.0f);
 		dirWave[4] = glm::vec3(0.0f, 0.0f, 0.5f);*/
 	//}
 
-	amplitudeWave = INIT_AMP_WAVE;
-	w = INIT_W;
+		amplitudeWave[0] = 0.5f;
+		amplitudeWave[1] = 0.8f;
+		amplitudeWave[2] = 0.4f;
+
+		w[0] = 1.2f;
+		w[1] = 1.8f;
+		w[2] = 1.6f;
+	//amplitudeWave = INIT_AMP_WAVE;
+	//w = INIT_W;
 
 	InitParticles();
 	InitClothMesh();
 	InitSphere();
 	for (int i = 0; i < ClothMesh::numVerts; i++) {
-		ptrWaveParticlesPos[i].y -= 9.0f;
+		//ptrWaveParticlesPos[i].y -= 9.0f;
 
 	}
 	ClothMesh::updateClothMesh((float*)ptrWaveParticlesPos);
@@ -218,15 +231,35 @@ void SphereMovement(float dt) {
 
 	//Verlet
 	glm::vec3 f = Sphere::SphereForce;
+	Sphere::SphereForce = mass *vGravAccel;
 	glm::vec3 p = p0 + (p0 - _p0) + (f / mass) * glm::pow(dt, 2);
 	glm::vec3 v = (p - p0) / dt;
 
  
 	//glm::vec3 tmp = amplitudeWave * cos(glm::dot(dirWave[j], p) - (w * currentTime));
+	float distColisionSphera=0.0f;
+	for (int i = 0; i < dirWave.size(); i++)
+	{
+		distColisionSphera += amplitudeWave[i] * cos(glm::dot(dirWave[i], p) - (w[i]*currentTime));
+	}
 
 	//if(tmp.y) ? > possphera - Radio -> Está hundido != -> Aun no ha llegado.
 	//Si está hundido -> Fflotacion = 1.f * 9.8 (modulo de la gravedad = mag grav) * Volumen Sumergido =(dEsphera * dEsphera * alturaSumergida (tmp- (posSphera - radio))) * y (0,1,0);  
-
+	float Esferadistance = Sphere::SpherePos.y - Sphere::radiusSphere;
+	if (distColisionSphera > Esferadistance)
+	{
+		float dEsfera = Sphere::radiusSphere * 2;
+		float alturaSumerjida = distColisionSphera - Esferadistance;
+		glm::vec3 fContraria = { 0.0f, 1.0f, 0.0f };
+		float VolumenSumerjido = dEsfera * dEsfera * alturaSumerjida;
+		if (VolumenSumerjido > dEsfera*dEsfera*dEsfera)
+		{
+			VolumenSumerjido = dEsfera*dEsfera*dEsfera;
+		}
+		glm::vec3 Fflotacion = 1.0f * 9.8f * VolumenSumerjido * fContraria;
+		Sphere::SphereForce += Fflotacion;
+	}
+	
 	Sphere::SpherePos0 = p0;
 	Sphere::SpherePos = p;
 	Sphere::SphereSpeed = v;
