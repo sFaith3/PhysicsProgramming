@@ -50,6 +50,7 @@ int main(int argc, char** argv) {
 		SDL_Quit();
 		return -1;
 	}
+
 	// Create window
 	SDL_Window *mainwindow;
 	SDL_GLContext maincontext;
@@ -62,7 +63,7 @@ int main(int argc, char** argv) {
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 
 	mainwindow = SDL_CreateWindow("Fluids", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-		800, 600, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+		1000, 800, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
 		if (!mainwindow) { /* Die if creation failed */
 			SDL_Log("Couldn't create SDL window: %s", SDL_GetError());
 			SDL_Quit();
@@ -125,9 +126,13 @@ int main(int argc, char** argv) {
 		waitforFrameEnd();
 	}
 
+	GLcleanup();
+	PhysicsCleanup();
+
 	ImGui_ImplSdlGL3_Shutdown();
 	SDL_GL_DeleteContext(maincontext);
 	SDL_DestroyWindow(mainwindow);
 	SDL_Quit();
+
 	return 0;
 }
