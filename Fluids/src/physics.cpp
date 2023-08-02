@@ -131,7 +131,7 @@ struct s_Sphere {
 		glm::vec3 f = force;
 		force = mass * vGravAccel;
 
-		glm::vec3 p = p0 + (p0 - _p0) + (f / mass) * glm::pow(dt, 2);
+		glm::vec3 p = p0 + (p0 - _p0) + (f / mass) * (float)glm::pow(dt, 2);
 		glm::vec3 v = (p - p0) / dt;
 
 		// Distancia para que la esfera colisione con la ola

@@ -315,7 +315,7 @@ void ParticleMovement(int currParticle, float dt) {
 	
 	// Verlet Method
 	glm::vec3 f = ptrParticlesForce[currParticle];
-	glm::vec3 p = p0 + (p0 - _p0) + (f / mass) * glm::pow(dt, 2);
+	glm::vec3 p = p0 + (p0 - _p0) + (f / mass) * (float)glm::pow(dt, 2);
 	glm::vec3 v = (p - p0) / dt;
 	
 	CheckCollisions(p0, p, v0, v);
