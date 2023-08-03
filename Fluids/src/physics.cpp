@@ -42,7 +42,8 @@ const int MAX_NUM_WAVES = 6;
 const float MAX_AMPLI_WAVE = 10.f;
 const float MAX_FREC_WAVE  = 10.f;
 
-const glm::vec3 DEF_WAVE_DIRS[MAX_NUM_WAVES] = { glm::vec3(.8f, 0.f, 0.f), glm::vec3(0.f, 0.f, .8f), glm::vec3(.8f, 0.f, 0.f), glm::vec3(.8f, 0.f, 0.f), glm::vec3(.8f, 0.f, 0.f), glm::vec3(.8f, 0.f, 0.f) };
+const glm::vec3 DEF_WAVE_DIRS[MAX_NUM_WAVES] = { glm::vec3(.8f, 0.f, 0.f), glm::vec3(0.f, 0.f, .8f), glm::vec3(.8f, 0.f, 0.f),
+												 glm::vec3(.8f, 0.f, 0.f), glm::vec3(.8f, 0.f, 0.f), glm::vec3(.8f, 0.f, 0.f) };
 const float		DEF_WAVE_AMPLIS[MAX_NUM_WAVES] = { .5f, .8f, .4f, .5f, .5f, .5f };
 const float		DEF_WAVE_Ws[MAX_NUM_WAVES]	   = { 1.2f, 1.8f, 1.6f, 1.5f, 1.5f, 1.5f };
 

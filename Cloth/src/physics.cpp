@@ -84,7 +84,7 @@ void GUI() {
 	bool show = true;
 	
 	ImGui::Begin("Physics Parameters", &show, 0);
-	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);//FrameRate
+	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate); // FrameRate
 
 	ImGui::Checkbox("Play Simulation", &playingSimulation);
 	if (ImGui::Button("Reset Simulation")) {

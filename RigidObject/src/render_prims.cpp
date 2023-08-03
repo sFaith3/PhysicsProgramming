@@ -60,17 +60,13 @@ void cleanupPrims() {
 void renderPrims() {
 	if (renderSphere)
 		Sphere::drawSphere();
+
 	if (renderCapsule)
 		Capsule::drawCapsule();
 
-	if (renderParticles) {
-		// You may need to rethink this piece of code...
-		int startDrawingFromParticle = 0;
-		int numParticlesToDraw = LilSpheres::maxParticles;
-		LilSpheres::drawParticles(startDrawingFromParticle, numParticlesToDraw);
-		// .............................................
-	}
-	
+	if (renderParticles)
+		LilSpheres::drawParticles(0, LilSpheres::maxParticles);
+
 	if (renderCloth)
 		ClothMesh::drawClothMesh();
 

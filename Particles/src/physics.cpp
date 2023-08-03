@@ -40,8 +40,8 @@ extern const int MAX_BUFFER_PARTICLES(SHRT_MAX / 3);
 bool playingSimulation;
 
 // EMITTER
-int emitterRateParticle;		//It must be >= 100
-float emitterParticleLifeTime;  //It must be >= 1.0
+int emitterRateParticle;	   // It must be >= 100
+float emitterParticleLifeTime; // It must be >= 1.0
 int emitterCurrType;
 glm::vec3 emitterPos;
 glm::vec3 emitterDir;
@@ -89,7 +89,7 @@ void PhysicsCleanup();
 void GUI() {
 	bool show = true;
 	ImGui::Begin("Physics Parameters", &show, 0);
-	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);//FrameRate
+	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate); // FrameRate
 
 	ImGui::Checkbox("Play Simulation", &playingSimulation);
 	if (ImGui::Button("Reset Simulation")) {

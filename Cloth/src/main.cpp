@@ -41,7 +41,7 @@ namespace {
 }
 
 int main(int argc, char** argv) {
-	//Init GLFW
+	// Init GLFW
 	if (SDL_Init(SDL_INIT_VIDEO) != 0) {
 		SDL_Log("Couldn't initialize SDL: %s", SDL_GetError());
 		SDL_Quit();
