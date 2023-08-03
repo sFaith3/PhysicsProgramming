@@ -73,7 +73,7 @@ glm::vec3 vGravAccel;
 
 float elasticCoef, frictionCoef;
 
-float pFluid; // densidad del fluido
+float pFluid; // fluid density
 float Cd;
 
 float resetTime;
@@ -93,7 +93,7 @@ class Wave {
 public:
 	glm::vec3 dir;
 	float amplitude;
-	float w; // frecuéncia de la ola
+	float w; // wave frequency
 
 	Wave() {
 	};
@@ -135,46 +135,47 @@ struct s_Sphere {
 		glm::vec3 p = p0 + (p0 - _p0) + (f / mass) * (float)glm::pow(dt, 2);
 		glm::vec3 v = (p - p0) / dt;
 
-		// Distancia para que la esfera colisione con la ola
-		float distColisionSphera = 0.f;
+		// Distance so that the sphere collides with the wave
+		float distColisionSphere = 0.f;
 		for (int i = 0; i < numWaves; i++) {
 			currWave = waves[i];
-			distColisionSphera += currWave->amplitude * cos(glm::dot(currWave->dir, p) - (currWave->w * (float)currentTime));
+			distColisionSphere += currWave->amplitude * cos(glm::dot(currWave->dir, p) - (currWave->w * (float)currentTime));
 		}
-		distColisionSphera += 3.0f;
+		distColisionSphere += 3.0f;
 
-		// Comprobar si se ha hundido/colisionado
-		float esferaDistance = pos.y - radius;
-		if (distColisionSphera > esferaDistance) { // Está hundida
-			float dEsfera = radius * 2.f;
-			float alturaSumerjida = distColisionSphera - esferaDistance;
+		// Check if it has submerged/collided
+		float currDistanceSphere = pos.y - radius;
+		if (distColisionSphere > currDistanceSphere) { // Is submerged
+			float dSphere = radius * 2.f;
+			float submergedHeight = distColisionSphere - currDistanceSphere;
 
-			float VolumenSumerjido = dEsfera * dEsfera * alturaSumerjida;
-			float volSphere = glm::pow(dEsfera, 3);
+			float submergedVolume = dSphere * dSphere * submergedHeight;
+			float volSphere = glm::pow(dSphere, 3);
 
-			if (VolumenSumerjido > volSphere) {
-				VolumenSumerjido = volSphere;
+			if (submergedVolume > volSphere) {
+				submergedVolume = volSphere;
 			}
 
-			// Fflotacion = 1.f * 9.8 (modulo de la gravedad = mag grav) * Volumen Sumergido = (dEsphera * dEsphera * alturaSumergida (tmp- (posSphera - radio))) * y (0,1,0);  
-			glm::vec3 fContraria = { 0.0f, 1.0f, 0.0f };
-			glm::vec3 Fflotacion = 1.0f * 9.8f * VolumenSumerjido * fContraria;
+			// Fflotation = 1.f * 9.8f (module of gravity = mag grav) * submergedVolume
+			// = (dSphere * dSphere * submergedHeight (tmp- (posSphere - radius))) * y (0,1,0);  
+			glm::vec3 FOpposite = { 0.0f, 1.0f, 0.0f };
+			glm::vec3 Fflotation = 1.0f * 9.8f * submergedVolume * FOpposite;
 
-			/// Fuerza de Drag
+			/// Force of Drag
 			float A, modU;
 			glm::vec3 U = speed;
 			modU = glm::length(U);
 
-			if (alturaSumerjida > radius) {
+			if (submergedHeight > radius) {
 				A = PI * glm::pow(radius, 2);
 			}
 			else {
-				A = PI * glm::pow(glm::distance(distColisionSphera, esferaDistance), 2);
+				A = PI * glm::pow(glm::distance(distColisionSphere, currDistanceSphere), 2);
 			}
 
-			//F = -0.5f * p * Cd * |A| * |U| * U
-			glm::vec3 FDraf = -0.5f * pFluid * Cd * A * modU * U;
-			force += (Fflotacion + FDraf);
+			// F = -0.5f * p * Cd * |A| * |U| * U
+			glm::vec3 FDrag = -0.5f * pFluid * Cd * A * modU * U;
+			force += (Fflotation + FDrag);
 		}
 
 		pos0 = p0;
@@ -197,7 +198,7 @@ void GUI() {
 	ImGui::Begin("Physics Parameters", &show, 0);
 
 	{	
-		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate); //FrameRate
+		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate); // FrameRate
 		
 		ImGui::Checkbox("Play Simulation", &isPlaying);
 		if (ImGui::Button("Reset Simulation")) {
@@ -298,8 +299,10 @@ void UpdateWavesCloth() {
 		for (int j = 0; j < numWaves; j++) {
 			currWave = waves[j];
 			modDir = glm::length(currWave->dir);
-			ptrWaveParticlesPos[i] -= (currWave->dir / modDir) * currWave->amplitude * sin(glm::dot(currWave->dir, ptrWaveParticlesPos0[i]) - (currWave->w * (float)currentTime));
-			ptrWaveParticlesPos[i].y += currWave->amplitude * cos(glm::dot(currWave->dir, ptrWaveParticlesPos0[i]) - (currWave->w * (float)currentTime));
+			ptrWaveParticlesPos[i] -= (currWave->dir / modDir) * currWave->amplitude
+										* sin(glm::dot(currWave->dir, ptrWaveParticlesPos0[i]) - (currWave->w * (float)currentTime));
+			ptrWaveParticlesPos[i].y += currWave->amplitude
+										* cos(glm::dot(currWave->dir, ptrWaveParticlesPos0[i]) - (currWave->w * (float)currentTime));
 		}
 		ptrWaveParticlesPos[i].y += dy;
 	}
