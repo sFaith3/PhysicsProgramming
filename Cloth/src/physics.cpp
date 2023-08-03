@@ -235,11 +235,11 @@ void CollisionParticlePlane(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 
 	p0 = p;
 	v0 = v;
 
-	// With Elasticity
+	// With elasticity
 	p = p0 - (1 + elasticCoef) * (glm::dot(n, p0) + d) * n;
 	v = v0 - (1 + elasticCoef) * glm::dot(n, v0) * n;
 
-	// With Friction
+	// With friction
 	glm::vec3 vn = glm::dot(n, v) * n;
 	glm::vec3 vt = v - vn;
 	v = v - (frictionCoef * vt);
@@ -248,34 +248,36 @@ void CollisionParticlePlane(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 
 
 
 void CollisionParticleWithSphere(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 &v) {
-	// Calculamos si la distancia entre la particula y el centro de la esfera - el Radio <=0
-	// Fórmula: d |C-P| = sqrt((pow((Cx - Px),2), pow((Cy - Py),2), pow((Cz - Pz),2))
+	// We calculate if the distance between the particle and the center of the sphere - the radius <= 0
+	// Formula: d |C-P| = sqrt((pow((Cx - Px),2), pow((Cy - Py),2), pow((Cz - Pz),2))
 	float d = glm::sqrt(glm::pow(Sphere::posSphere.x - p.x, 2) + glm::pow(Sphere::posSphere.y - p.y, 2) + glm::pow(Sphere::posSphere.z - p.z, 2));
 	if (d < Sphere::radiusSphere) {
-		glm::vec3 p0p = p - p0;
-		float alfa1 = 0, alfa2 = 0, resultAlfa = 0;
-
-		// Usaremos la equación de la recta y la equacion de la esfera.
-		// Sacaremos una equiacion Ax^2 + bx + c = 0 para descubrir la alfa
-		//float a = glm::pow(p0.x - Sphere::posSphere.x, 2) + glm::pow(p0.y - Sphere::posSphere.y, 2) + glm::pow(p0.z - Sphere::posSphere.z, 2) - glm::pow(Sphere::radiusSphere, 2) +
-		//	2 * ((p0.x - Sphere::posSphere.x) + (p0.y - Sphere::posSphere.y) + (p0.z - Sphere::posSphere.z));
+		// We use the equation of the straight line and the sphere equation.
+		// Ax^2 + bx + c = 0 to get the alpha.
+		//glm::vec3 p0p = p - p0;
+		//float alpha1 = 0, alpha2 = 0, resultAlpha = 0;
+		//
+		//float a = glm::pow(p0.x - Sphere::posSphere.x, 2) + glm::pow(p0.y - Sphere::posSphere.y, 2) + glm::pow(p0.z - Sphere::posSphere.z, 2) - glm::pow(Sphere::radiusSphere, 2)
+		//			+ 2 * ((p0.x - Sphere::posSphere.x) + (p0.y - Sphere::posSphere.y) + (p0.z - Sphere::posSphere.z));
 		//float b = 2 * ((p.x - p0.x) + (p.y - p0.y) + (p.z - p0.z));
 		//float c = glm::pow(glm::pow(p.x - p0.x, 2) + glm::pow(p.y - p0.y, 2) + glm::pow(p.z - p0.z, 2), 2);
 		//
-		//alfa1 = -b  +  glm::sqrt(glm::pow(b, 2) - (4 * a*c))  /  2 * a;
-		//alfa2 = -b - glm::sqrt(glm::pow(b, 2) - (4 * a*c)) / 2 * a;
+		//alpha1 = -b + glm::sqrt(glm::pow(b, 2) - (4 * a*c)) / 2 * a;
+		//alpha2 = -b - glm::sqrt(glm::pow(b, 2) - (4 * a*c)) / 2 * a;
 		//
-		//(glm::abs(alfa1) > glm::abs(alfa2)) ? resultAlfa = alfa2 : resultAlfa = alfa1;
+		//(glm::abs(alpha1) > glm::abs(alpha2)) ? resultAlpha = alpha2 : resultAlpha = alpha1;
 		//
-		//// recta: r = p0 + &p0p; buscaremos el valor "&".
-		//// Una vez tengamos alfa conoceremos el punto de colision.
-		//glm::vec3 PuntoColision = { p0.x + p0p.x *resultAlfa, p0.y + p0p.y *resultAlfa, p0.z + p0p.z *resultAlfa };
-		//glm::vec3 n = glm::normalize(PuntoColision - Sphere::posSphere);
+		// Straight line: r = p0 + &p0p. We need the alpha value "&".
+		// With the alpha we know the collision point.
+		//glm::vec3 collisionPoint = { p0.x + p0p.x * resultAlpha, p0.y + p0p.y * resultAlpha, p0.z + p0p.z * resultAlpha };
+		//glm::vec3 n = glm::normalize(collisionPoint - Sphere::posSphere);
+		//float D = -glm::dot(n, collisionPoint);
 
-		glm::vec3 PuntoColision;
+		glm::vec3 collisionPoint;
 		glm::vec3 n;
-		glm::intersectLineSphere(p, p0, Sphere::posSphere, Sphere::radiusSphere, PuntoColision, n);
-		float D = -glm::dot(n, PuntoColision);
+		glm::intersectLineSphere(p, p0, Sphere::posSphere, Sphere::radiusSphere, collisionPoint, n);
+		float D = -glm::dot(n, collisionPoint);
+
 		CollisionParticlePlane(p0, p, v0, v, n, D);
 	}
 }
@@ -308,7 +310,6 @@ void CheckCollisions(glm::vec3 p0, glm::vec3 &p, glm::vec3 v0, glm::vec3 &v) {
 }
 
 void ParticleMovement(int currParticle, float dt) {
-	
 	glm::vec3 _p0 = ptrParticlesPos0[currParticle];
 	glm::vec3 p0 = ptrParticlesPos[currParticle];
 	glm::vec3 v0 = ptrParticlesSpeed[currParticle];
@@ -323,11 +324,9 @@ void ParticleMovement(int currParticle, float dt) {
 	ptrParticlesPos0[currParticle] = p0;
 	ptrParticlesPos[currParticle] = p;
 	ptrParticlesSpeed[currParticle] = v;
-	
 }
 
 glm::vec3 CalculateCurrForce(int currPos, int nextPos, glm::vec3 P1, glm::vec3 P2, glm::vec3 v1, glm::vec3 v2, float L, SpringsType currSpringTypeEnum) {
-	
 	P1 = ptrParticlesPos[currPos];
 	P2 = ptrParticlesPos[nextPos];
 	v1 = ptrParticlesSpeed[currPos];
@@ -723,9 +722,7 @@ void ParticlesForces(){
 }
 
 void UpdateParticles(float dt) {
-	
-		ParticlesForces();
-	
+	ParticlesForces();
 
 	for (int i = 0; i < ClothMesh::numVerts; i++) {
 		if (i != 0 && i != ClothMesh::numCols - 1) {
@@ -733,17 +730,14 @@ void UpdateParticles(float dt) {
 		}
 	}
 
-
 	/*glm::vec3 prevP;
-	glm::vec3 v_P1P2; 
-	for (int n = 0; n < 10; n++)
-	{
+	glm::vec3 v_P1P2;
+	for (int n = 0; n < 10; n++) {
 		for (int i = 0; i < ClothMesh::numVerts; i++) {
 			if (i != 0 && i != ClothMesh::numCols - 1) {
 				prevP = ptrParticlesPos[i - 1];
 				v_P1P2 = prevP - ptrParticlesPos[i];
-				if (glm::length(v_P1P2) > particleLink)
-				{
+				if (glm::length(v_P1P2) > particleLink) {
 					ptrParticlesPos[i] = prevP + (glm::normalize(v_P1P2) * particleLink);
 				}
 			}
