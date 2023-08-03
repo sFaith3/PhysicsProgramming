@@ -241,19 +241,19 @@ void InitPlanes() {
  * Collision Correction - Impulse
  */
 void CollisionParticlePlane(glm::vec3 p0, glm::vec3 &p, glm::vec3 n, float d, glm::vec3 v, glm::vec3 w, glm::vec3 posCube, glm::mat3 I, glm::vec3 &P, glm::vec3 &L) {
-	//Calculamos "pä": velocidad Vertice que ha colisionado en el plano.
+	// We calculate "pä": velocity Vertex that has collided in the plane.
 	// pä = va(t0) + wa(t0) x (pa(t0)- xa(t0));
 	// ra = (pa(t0) - xa(t0));
 	glm::vec3 ra = p - posCube ;
 	glm::vec3 particleVel = v + glm::cross(w, ra);
 
-	//Calculamos vrel
-	//Vrel = n(t0) * (pä(t0)-pb(to)); pb = 0;
+	// We calculate Vrel
+	// Vrel = n(t0) * (pä(t0)-pb(to)); pb = 0;
 	float Vrel = glm::dot(n, particleVel);
 	
 	if (Vrel < 0.f){
-		//Una vez Calculada Vrel la utilizaremos para calcular la J
-		// j = -(1 - coefElasticidad) * Vrel / ((1/Ma) + n(t0) * (Ia^-1(t0) (ra x n(t0))) x ra);
+		// We use Vrel to calculate J
+		// j = -(1 - coefElasticity) * Vrel / ((1/Ma) + n(t0) * (Ia^-1(t0) (ra x n(t0))) x ra);
 		float j = -((1 + coefElastic) * Vrel) / ((1 / MASS) + glm::dot(n, glm::cross(I * glm::cross(ra, n), ra)));
 		// J = j * n;
 		glm::vec3 J = j * n;
