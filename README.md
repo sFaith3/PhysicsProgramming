@@ -21,7 +21,7 @@ Physics applications made with C/C++, OpenGL, and SDL2 for PC at the university.
 
 ## Particles
 
-https://github.com/sFaith3/PhysicsProgramming/assets/14791312/3bdb0253-202e-4b84-9bf5-a037bab36093
+https://github.com/sFaith3/PhysicsProgramming/assets/14791312/e598d9cc-a9c2-4e4b-bca9-84b173369cab
 
 The simulation of the particle system is carried out in a box. This system has two types of emitters: fountain and cascade. Its parameters can be adjusted by the user from the interface, such as the emission rate (no less than 100 particles per second) and the lifetime of each.
 
@@ -32,19 +32,19 @@ The main characteristics:
 
 ## Cloth
 
-https://github.com/sFaith3/PhysicsProgramming/assets/14791312/4eeafc33-4ef9-4f47-9770-231670e9c286
+https://github.com/sFaith3/PhysicsProgramming/assets/14791312/9f67e372-9845-469c-b8c2-8d037d6b213a
 
 The clothing simulation is carried out in a box. This model deformation system, Provot's model, consists of multiple resorts between particles. And its parameters are adjustable by the user from the interface, such as resorts and collisions.
 
 ## Rigid Object
 
-https://github.com/sFaith3/PhysicsProgramming/assets/14791312/2b2ee260-8bcd-4f11-bf65-ba6f9b556be7
+https://github.com/sFaith3/PhysicsProgramming/assets/14791312/04064a13-1413-4b21-9e4d-a73581059bd8
 
 This simulation, on the handling of collisions in a rigid body, consists of throwing one by applying a force on it, varying the amount and the place where it is applied, so that it collides in different ways with its environment.
 
 ## Fluids
 
-https://github.com/sFaith3/PhysicsProgramming/assets/14791312/bf217aaf-e10f-444c-8082-2523945a22b9
+https://github.com/sFaith3/PhysicsProgramming/assets/14791312/28fe0973-1e86-4e24-ba2e-4d324c030bdd
 
 This basic fluid simulation uses Gerstner waves, one of the most common methods in video games. To make things more interesting, a sphere is added that must fall from a height and sink or float according to its mass. And its parameters are adjustable by the user from the interface, for example, the fluid density, the number of waves, the direction, amplitude and frequency of each, and the mass and radius of the sphere.
 
